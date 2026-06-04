@@ -33,6 +33,13 @@ CREATE INDEX IF NOT EXISTS idx_orders_status_date ON orders(status, order_date D
 -- Partial index: only PENDING orders (smaller, faster for this common query)
 CREATE INDEX IF NOT EXISTS idx_orders_pending ON orders(order_date DESC) WHERE status = 'PENDING';
 
+-- Covering index: includes all columns needed for "my recent orders" query
+-- Enables Index Only Scan — no need to access the table (heap)
+-- Columns: user_id, order_date (for WHERE + ORDER BY)
+-- Included: total_amount, status (returned by query but not used for search/sort)
+CREATE INDEX IF NOT EXISTS idx_orders_user_date_covering
+ON orders(user_id, order_date DESC) INCLUDE (total_amount, status);
+
 -- Update table statistics after index creation
 ANALYZE users;
 ANALYZE products;
