@@ -1,5 +1,6 @@
 package org.example.performencetuning.data;
 
+import org.example.performencetuning.benchmark.QueryBenchmarkRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,9 @@ public class BenchmarkRunner implements CommandLineRunner {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private QueryBenchmarkRunner queryBenchmarkRunner;
+
     private final DataGenerator dataGenerator = new DataGenerator();
     private final Random random = new Random();
 
@@ -42,6 +46,9 @@ public class BenchmarkRunner implements CommandLineRunner {
             System.out.println("1. Hien thi so luong dong cua cac bang");
             System.out.println("2. Thuc hien nap du lieu (neu CSDL trong)");
             System.out.println("3. Xoa sach du lieu (Truncate) tat ca cac bang");
+            System.out.println("4. Benchmark truy van KHONG co index (baseline)");
+            System.out.println("5. Benchmark truy van CO index");
+            System.out.println("6. So sanh phan trang: OFFSET vs CURSOR");
             System.out.println("0. Thoat chuong trinh");
             System.out.print("Nhap lua chon cua ban: ");
             
@@ -62,6 +69,12 @@ public class BenchmarkRunner implements CommandLineRunner {
                 checkAndPopulateData();
             } else if (choice.equals("3")) {
                 truncateAllTables(scanner);
+            } else if (choice.equals("4")) {
+                runQueryBenchmarkWithoutIndexes();
+            } else if (choice.equals("5")) {
+                runQueryBenchmarkWithIndexes();
+            } else if (choice.equals("6")) {
+                runPaginationComparison();
             } else {
                 System.out.println("Lua chon khong hop le! Vui long chon lai.");
             }
@@ -398,6 +411,30 @@ public class BenchmarkRunner implements CommandLineRunner {
         System.out.println("  => KET QUA BATCH INSERT ORDER ITEMS:");
         System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
         System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
+    }
+
+    private void runQueryBenchmarkWithoutIndexes() {
+        try {
+            queryBenchmarkRunner.runBenchmarksWithoutIndexes();
+        } catch (Exception e) {
+            System.err.println("Loi khi chay benchmark: " + e.getMessage());
+        }
+    }
+
+    private void runQueryBenchmarkWithIndexes() {
+        try {
+            queryBenchmarkRunner.runBenchmarksWithIndexes();
+        } catch (Exception e) {
+            System.err.println("Loi khi chay benchmark: " + e.getMessage());
+        }
+    }
+
+    private void runPaginationComparison() {
+        try {
+            queryBenchmarkRunner.runPaginationComparison();
+        } catch (Exception e) {
+            System.err.println("Loi khi chay so sanh phan trang: " + e.getMessage());
+        }
     }
 
     private void resetDatabaseSequences(Connection conn) throws Exception {
