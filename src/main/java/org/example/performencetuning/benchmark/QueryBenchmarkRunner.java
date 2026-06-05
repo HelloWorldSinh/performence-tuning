@@ -9,6 +9,8 @@ import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class QueryBenchmarkRunner {
@@ -72,18 +74,20 @@ public class QueryBenchmarkRunner {
 
         lastBTreeBefore = runExplainAnalyze(sql);
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : lastBTreeBefore.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", lastBTreeBefore.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(lastBTreeBefore);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, true, false);
 
         printPlanSummary(lastBTreeBefore, false, null);
 
-        System.out.println("\nExpected issue:");
-        System.out.println("- Without an index on order_id, PostgreSQL must scan all 10M rows");
-        System.out.println("  in order_items (Parallel Seq Scan) and filter out non-matching rows.");
         System.out.println("=".repeat(70));
     }
 
@@ -120,12 +124,17 @@ public class QueryBenchmarkRunner {
         ExplainResult afterResult = runExplainAnalyze(sql);
         lastBTreeAfter = afterResult;
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : afterResult.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", afterResult.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(afterResult);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, false, false);
 
         String indexUsed = printPlanSummary(afterResult, true,
                 "B-Tree index on order_id allows direct lookup of items belonging to an order.");
@@ -162,18 +171,20 @@ public class QueryBenchmarkRunner {
 
         lastCompositeBefore = runExplainAnalyze(sql);
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : lastCompositeBefore.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", lastCompositeBefore.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(lastCompositeBefore);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, true, false);
 
         printPlanSummary(lastCompositeBefore, false, null);
 
-        System.out.println("\nExpected issue:");
-        System.out.println("- Without a composite index on (status, order_date DESC),");
-        System.out.println("  the database must scan, filter, and sort many rows.");
         System.out.println("=".repeat(70));
     }
 
@@ -210,12 +221,17 @@ public class QueryBenchmarkRunner {
         ExplainResult afterResult = runExplainAnalyze(sql);
         lastCompositeAfter = afterResult;
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : afterResult.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", afterResult.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(afterResult);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, false, false);
 
         String indexUsed = printPlanSummary(afterResult, true,
                 "Composite index supports both WHERE status and ORDER BY order_date DESC in a single index scan.");
@@ -254,18 +270,20 @@ public class QueryBenchmarkRunner {
 
         lastCoveringBefore = runExplainAnalyze(sql);
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : lastCoveringBefore.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", lastCoveringBefore.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(lastCoveringBefore);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, true, false);
 
         printPlanSummary(lastCoveringBefore, false, null);
 
-        System.out.println("\nExpected plan:");
-        System.out.println("- With a normal composite index, PostgreSQL uses Index Scan");
-        System.out.println("  but still needs to access the heap/table for total_amount and status.");
         System.out.println("=".repeat(70));
     }
 
@@ -306,30 +324,21 @@ public class QueryBenchmarkRunner {
         ExplainResult afterResult = runExplainAnalyze(sql);
         lastCoveringAfter = afterResult;
 
-        System.out.println("\nEXPLAIN ANALYZE:");
+        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
         for (String line : afterResult.outputLines) {
             System.out.println("  " + line);
         }
 
-        System.out.printf("%nExecution time: %.1f ms%n", afterResult.executionTimeMs);
+        ExplainSummary summary = parseExplainOutput(afterResult);
+        System.out.println("\nParsed Execution Summary:");
+        printExecutionSummary(summary);
+        System.out.println("\nEXPLAIN Meaning:");
+        printExplainMeaning(summary);
+        printPlanInterpretation(summary, false, true);
 
         String indexUsed = printPlanSummary(afterResult, true,
                 "Covering index contains all columns the query needs. PostgreSQL can use\n" +
                 "  Index Only Scan. If Heap Fetches = 0, no table access is needed.");
-
-        // Check Heap Fetches
-        boolean heapFetchesZero = false;
-        for (String line : afterResult.outputLines) {
-            if (line.contains("Heap Fetches:")) {
-                System.out.println("\n  >> " + line.trim());
-                if (line.contains("Heap Fetches: 0")) {
-                    heapFetchesZero = true;
-                }
-            }
-        }
-        if (heapFetchesZero) {
-            System.out.println("  >> Heap Fetches = 0: Index Only Scan succeeded!");
-        }
 
         printBeforeAfterComparison(lastCoveringBefore, afterResult, indexUsed);
         System.out.println("=".repeat(70));
@@ -477,6 +486,29 @@ public class QueryBenchmarkRunner {
         }
     }
 
+    /**
+     * Parsed fields from EXPLAIN ANALYZE output.
+     */
+    static class ExplainSummary {
+        String mainPlanNode = "N/A";
+        String scanType = "N/A";
+        String estimatedCost = "N/A";
+        String estimatedRows = "N/A";
+        String estimatedWidth = "N/A";
+        String actualStartupTime = "N/A";
+        String actualTotalTime = "N/A";
+        String actualRows = "N/A";
+        String rowsRemovedByFilter = "N/A";
+        String buffers = "N/A";
+        double executionTimeMs;
+        String indexUsed = "N/A";
+        String heapFetches = "N/A";
+        String workersPlanned = "N/A";
+        String workersLaunched = "N/A";
+        String indexCond = "N/A";
+        String filter = "N/A";
+    }
+
     private ExplainResult runExplainAnalyze(String sql) {
         List<String> lines = new ArrayList<>();
         double execTime = 0.0;
@@ -550,6 +582,370 @@ public class QueryBenchmarkRunner {
             }
         }
         return "N/A";
+    }
+
+    // ========================================================================
+    // EXPLAIN parser and formatted output
+    // ========================================================================
+
+    /**
+     * Parse EXPLAIN ANALYZE output lines into a structured ExplainSummary.
+     */
+    private ExplainSummary parseExplainOutput(ExplainResult result) {
+        ExplainSummary s = new ExplainSummary();
+        if (result == null) return s;
+
+        s.executionTimeMs = result.executionTimeMs;
+        s.scanType = extractScanType(result);
+        s.indexUsed = extractIndexUsed(result);
+
+        // Regex patterns for parsing EXPLAIN lines
+        Pattern costRowsWidthPattern = Pattern.compile(
+                "cost=([\\d.]+)\\.\\.([\\d.]+)\\s+rows=(\\d+)\\s+width=(\\d+)");
+        Pattern actualPattern = Pattern.compile(
+                "actual time=([\\d.]+)\\.\\.([\\d.]+)\\s+rows=(\\d+)");
+
+        for (String line : result.outputLines) {
+            String trimmed = line.trim();
+
+            // Main plan node: first line with cost/rows info (not starting with ->)
+            if (!trimmed.startsWith("->") && trimmed.contains("cost=")
+                    && "N/A".equals(s.mainPlanNode)) {
+                // Extract node name (before the parenthesis)
+                int parenIdx = trimmed.indexOf('(');
+                if (parenIdx > 0) {
+                    s.mainPlanNode = trimmed.substring(0, parenIdx).trim();
+                }
+
+                // Extract cost, rows, width
+                Matcher m = costRowsWidthPattern.matcher(trimmed);
+                if (m.find()) {
+                    s.estimatedCost = m.group(1) + ".." + m.group(2);
+                    s.estimatedRows = m.group(3);
+                    s.estimatedWidth = m.group(4);
+                }
+
+                // Extract actual time and rows
+                Matcher am = actualPattern.matcher(trimmed);
+                if (am.find()) {
+                    s.actualStartupTime = am.group(1);
+                    s.actualTotalTime = am.group(2);
+                    s.actualRows = am.group(3);
+                }
+            }
+
+            // Workers
+            if (trimmed.startsWith("Workers Planned:")) {
+                s.workersPlanned = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+            }
+            if (trimmed.startsWith("Workers Launched:")) {
+                s.workersLaunched = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+            }
+
+            // Rows Removed by Filter
+            if (trimmed.contains("Rows Removed by Filter:")) {
+                int idx = trimmed.indexOf("Rows Removed by Filter:");
+                String val = trimmed.substring(idx + "Rows Removed by Filter:".length()).trim();
+                s.rowsRemovedByFilter = formatNumber(val);
+            }
+
+            // Buffers (first one found, skip Planning buffers)
+            if (trimmed.startsWith("Buffers:") && "N/A".equals(s.buffers)) {
+                s.buffers = trimmed.substring("Buffers:".length()).trim();
+            }
+
+            // Heap Fetches
+            if (trimmed.contains("Heap Fetches:")) {
+                int idx = trimmed.indexOf("Heap Fetches:");
+                s.heapFetches = trimmed.substring(idx + "Heap Fetches:".length()).trim();
+            }
+
+            // Index Cond
+            if (trimmed.startsWith("Index Cond:") && "N/A".equals(s.indexCond)) {
+                s.indexCond = trimmed.substring("Index Cond:".length()).trim();
+            }
+
+            // Filter (but not "Rows Removed by Filter")
+            if (trimmed.startsWith("Filter:") && !trimmed.contains("Rows Removed")) {
+                s.filter = trimmed.substring("Filter:".length()).trim();
+            }
+        }
+
+        return s;
+    }
+
+    /**
+     * Format a number string with commas (e.g. "3333332" -> "3,333,332").
+     */
+    private String formatNumber(String numStr) {
+        try {
+            long num = Long.parseLong(numStr.trim());
+            return String.format("%,d", num);
+        } catch (NumberFormatException e) {
+            return numStr;
+        }
+    }
+
+    /**
+     * Print an ASCII table with auto-calculated column widths.
+     * First row in `rows` is treated as the header.
+     */
+    private void printTable(String title, List<String[]> rows) {
+        if (rows.isEmpty()) return;
+
+        int numCols = rows.get(0).length;
+        int[] colWidths = new int[numCols];
+
+        // Calculate max width per column
+        for (String[] row : rows) {
+            for (int i = 0; i < numCols && i < row.length; i++) {
+                colWidths[i] = Math.max(colWidths[i], row[i].length());
+            }
+        }
+        // Add padding
+        for (int i = 0; i < numCols; i++) {
+            colWidths[i] += 2; // 1 space padding on each side
+        }
+
+        if (title != null && !title.isEmpty()) {
+            System.out.println(title);
+        }
+
+        // Top border
+        printTableBorder('┌', '┐', '┬', colWidths);
+
+        // Header row (first row)
+        printTableRow(rows.get(0), colWidths);
+
+        // Header separator
+        printTableBorder('├', '┤', '┼', colWidths);
+
+        // Data rows
+        for (int i = 1; i < rows.size(); i++) {
+            printTableRow(rows.get(i), colWidths);
+        }
+
+        // Bottom border
+        printTableBorder('└', '┘', '┴', colWidths);
+    }
+
+    private void printTableBorder(char left, char right, char mid, int[] colWidths) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(left);
+        for (int i = 0; i < colWidths.length; i++) {
+            sb.append("─".repeat(colWidths[i]));
+            sb.append(i < colWidths.length - 1 ? mid : right);
+        }
+        System.out.println(sb);
+    }
+
+    private void printTableRow(String[] cols, int[] colWidths) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('│');
+        for (int i = 0; i < colWidths.length; i++) {
+            String val = i < cols.length ? cols[i] : "";
+            sb.append(' ');
+            sb.append(val);
+            int padding = colWidths[i] - val.length() - 1;
+            if (padding > 0) sb.append(" ".repeat(padding));
+            sb.append('│');
+        }
+        System.out.println(sb);
+    }
+
+    /**
+     * Print the parsed execution summary as an ASCII table.
+     */
+    private void printExecutionSummary(ExplainSummary s) {
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Metric", "Value"});
+        rows.add(new String[]{"Main plan node", s.mainPlanNode});
+        rows.add(new String[]{"Scan type", s.scanType});
+
+        if (!"N/A".equals(s.estimatedCost)) {
+            rows.add(new String[]{"Estimated cost", s.estimatedCost});
+        }
+        if (!"N/A".equals(s.estimatedRows)) {
+            rows.add(new String[]{"Estimated rows", s.estimatedRows});
+        }
+        if (!"N/A".equals(s.estimatedWidth)) {
+            rows.add(new String[]{"Estimated width (bytes)", s.estimatedWidth});
+        }
+        if (!"N/A".equals(s.actualStartupTime) && !"N/A".equals(s.actualTotalTime)) {
+            rows.add(new String[]{"Actual time (ms)", s.actualStartupTime + " .. " + s.actualTotalTime});
+        }
+        if (!"N/A".equals(s.actualRows)) {
+            rows.add(new String[]{"Actual rows returned", s.actualRows});
+        }
+        if (!"N/A".equals(s.rowsRemovedByFilter)) {
+            rows.add(new String[]{"Rows removed by filter", s.rowsRemovedByFilter});
+        }
+        if (!"N/A".equals(s.buffers)) {
+            rows.add(new String[]{"Buffers", s.buffers});
+        }
+        rows.add(new String[]{"Execution time (ms)", String.format("%.1f", s.executionTimeMs)});
+        if (!"N/A".equals(s.indexUsed)) {
+            rows.add(new String[]{"Index used", s.indexUsed});
+        }
+        if (!"N/A".equals(s.heapFetches)) {
+            rows.add(new String[]{"Heap Fetches", s.heapFetches});
+        }
+        if (!"N/A".equals(s.workersPlanned)) {
+            rows.add(new String[]{"Workers planned", s.workersPlanned});
+        }
+        if (!"N/A".equals(s.workersLaunched)) {
+            rows.add(new String[]{"Workers launched", s.workersLaunched});
+        }
+        if (!"N/A".equals(s.indexCond)) {
+            rows.add(new String[]{"Index Cond", s.indexCond});
+        }
+        if (!"N/A".equals(s.filter)) {
+            rows.add(new String[]{"Filter", s.filter});
+        }
+
+        printTable("", rows);
+    }
+
+    /**
+     * Print a table explaining what each EXPLAIN parameter means.
+     */
+    private void printExplainMeaning(ExplainSummary s) {
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Parameter", "Type", "Meaning"});
+
+        if (!"N/A".equals(s.estimatedCost)) {
+            rows.add(new String[]{
+                    "cost=" + s.estimatedCost,
+                    "Estimate",
+                    "Planner estimates this query costs ~" + s.estimatedCost.split("\\.\\.")[1] + " cost units"
+            });
+        }
+        if (!"N/A".equals(s.estimatedRows)) {
+            rows.add(new String[]{
+                    "rows=" + s.estimatedRows,
+                    "Estimate",
+                    "Planner expected " + s.estimatedRows + " rows to be returned"
+            });
+        }
+        if (!"N/A".equals(s.estimatedWidth)) {
+            rows.add(new String[]{
+                    "width=" + s.estimatedWidth,
+                    "Estimate",
+                    "Each row is estimated at " + s.estimatedWidth + " bytes wide"
+            });
+        }
+        if (!"N/A".equals(s.actualStartupTime) && !"N/A".equals(s.actualTotalTime)) {
+            rows.add(new String[]{
+                    "actual time=" + s.actualStartupTime + ".." + s.actualTotalTime,
+                    "Actual",
+                    "First row at " + s.actualStartupTime + "ms, finished at " + s.actualTotalTime + "ms"
+            });
+        }
+        if (!"N/A".equals(s.actualRows)) {
+            rows.add(new String[]{
+                    "rows=" + s.actualRows + " (actual)",
+                    "Actual",
+                    s.actualRows + " rows actually matched the condition"
+            });
+        }
+        if (!"N/A".equals(s.rowsRemovedByFilter)) {
+            rows.add(new String[]{
+                    "Rows Removed by Filter",
+                    "Actual",
+                    s.rowsRemovedByFilter + " rows read but discarded (not matching WHERE)"
+            });
+        }
+        if (!"N/A".equals(s.buffers)) {
+            rows.add(new String[]{
+                    "Buffers",
+                    "Actual",
+                    "Pages read from memory (hit) and disk (read)"
+            });
+        }
+        if (!"N/A".equals(s.heapFetches)) {
+            rows.add(new String[]{
+                    "Heap Fetches=" + s.heapFetches,
+                    "Actual",
+                    "Table page accesses during Index Only Scan. 0 = all data from index"
+            });
+        }
+        if (!"N/A".equals(s.workersPlanned)) {
+            rows.add(new String[]{
+                    "Workers",
+                    "Plan",
+                    "Parallel workers: " + s.workersPlanned + " planned, " + s.workersLaunched + " launched"
+            });
+        }
+
+        printTable("", rows);
+    }
+
+    /**
+     * Print a human-readable interpretation of the execution plan.
+     */
+    private void printPlanInterpretation(ExplainSummary s, boolean isTraditional, boolean isCovering) {
+        System.out.println("\nPlan Interpretation:");
+
+        if (isTraditional) {
+            printTraditionalInterpretation(s);
+        } else if (isCovering) {
+            printCoveringInterpretation(s);
+        } else {
+            printOptimizedInterpretation(s);
+        }
+    }
+
+    private void printTraditionalInterpretation(ExplainSummary s) {
+        String scan = s.scanType;
+        System.out.println("- PostgreSQL used " + scan + ", which reads "
+                + ("Parallel Seq Scan".equals(scan) ? "the table in parallel across multiple workers." : "the entire table sequentially."));
+
+        if (!"N/A".equals(s.actualRows)) {
+            System.out.println("- The query returned only " + s.actualRows + " row(s).");
+        }
+        if (!"N/A".equals(s.rowsRemovedByFilter)) {
+            System.out.println("- However, " + s.rowsRemovedByFilter
+                    + " rows were read and discarded by the filter — this is wasted I/O.");
+        }
+        if (!"N/A".equals(s.buffers)) {
+            System.out.println("- Buffer usage (" + s.buffers + ") indicates heavy disk/memory reads.");
+        }
+        System.out.println("- This is why an index is needed — to avoid scanning the entire table.");
+    }
+
+    private void printOptimizedInterpretation(ExplainSummary s) {
+        if (!"N/A".equals(s.indexUsed)) {
+            System.out.println("- PostgreSQL used " + s.scanType + " using " + s.indexUsed + ".");
+        } else {
+            System.out.println("- PostgreSQL used " + s.scanType + ".");
+        }
+        System.out.println("- The database jumped directly to the matching rows using the index.");
+
+        if ("N/A".equals(s.rowsRemovedByFilter) || "0".equals(s.rowsRemovedByFilter.replace(",", ""))) {
+            System.out.println("- Rows removed by filter is zero or absent — no wasted reads.");
+        } else {
+            System.out.println("- Rows removed by filter: " + s.rowsRemovedByFilter + " (much lower than without index).");
+        }
+        if (!"N/A".equals(s.buffers)) {
+            System.out.println("- Buffer usage (" + s.buffers + ") is much lower than the traditional query.");
+        }
+        System.out.println("- This proves the index is effective for this query pattern.");
+    }
+
+    private void printCoveringInterpretation(ExplainSummary s) {
+        System.out.println("- PostgreSQL used " + s.scanType + " using " + s.indexUsed + ".");
+        System.out.println("- The database read all needed columns directly from the index.");
+
+        if (!"N/A".equals(s.heapFetches)) {
+            System.out.println("- Heap Fetches = " + s.heapFetches + " — "
+                    + ("0".equals(s.heapFetches)
+                    ? "no table access needed. All data was in the index."
+                    : "some table pages were still accessed (visibility map may need VACUUM)."));
+        }
+        if (!"N/A".equals(s.buffers)) {
+            System.out.println("- Buffer usage (" + s.buffers + ") is lower than a regular Index Scan.");
+        }
+        System.out.println("- Covering index avoids random I/O to the heap for extra columns.");
     }
 
     /**

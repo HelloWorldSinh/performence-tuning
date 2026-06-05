@@ -4,6 +4,8 @@
 
 Ứng dụng CLI cho phép chạy từng bước trước/sau khi có index. Chạy `.\gradlew.bat bootRun`.
 
+Khi chạy menu 4–9, CLI hiển thị: raw EXPLAIN ANALYZE, parsed execution summary (ASCII table), EXPLAIN meaning table, plan interpretation, và performance comparison.
+
 ```
 ===== Indexing Demo: Before vs After =====
 4. B-Tree Index - Traditional query WITHOUT index

@@ -492,3 +492,15 @@ Indexes can consume more storage than the table itself.
 | 8 | Covering — Traditional query WITHOUT covering index |
 | 9 | Covering — Optimized query WITH covering index |
 | 10 | Run full Indexing comparison report |
+
+### CLI Output Format
+
+When running menu 4–9, the CLI prints:
+
+1. **Business problem** — what the query is trying to do
+2. **SQL** — the actual query being tested
+3. **EXPLAIN ANALYZE raw output** — full PostgreSQL execution plan
+4. **Parsed Execution Summary** — ASCII table with key metrics (scan type, cost, rows, buffers, execution time)
+5. **EXPLAIN Meaning** — table explaining what each EXPLAIN parameter means in plain English
+6. **Plan Interpretation** — human-readable analysis of why the query is fast or slow
+7. **Performance comparison** — before/after timing and speedup (when running traditional then optimized)

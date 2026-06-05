@@ -299,7 +299,15 @@ Chạy lần lượt menu 4→5→6→7→8→9 và in bảng tổng hợp:
 
 ## EXPLAIN / EXPLAIN ANALYZE
 
-Khi chạy các menu indexing, output sẽ hiển thị kết quả `EXPLAIN (ANALYZE, BUFFERS)`. Các thông số cần chú ý:
+Khi chạy các menu indexing (4–9), CLI sẽ hiển thị:
+
+1. **Raw EXPLAIN ANALYZE** — đầy đủ output từ PostgreSQL
+2. **Parsed Execution Summary** — bảng ASCII tóm tắt các metrics chính (scan type, cost, rows, buffers, execution time)
+3. **EXPLAIN Meaning** — bảng giải thích từng tham số EXPLAIN bằng tiếng Anh dễ hiểu
+4. **Plan Interpretation** — nhận xét human-readable về cách query chạy và tại sao nhanh/chậm
+5. **Performance comparison** — so sánh before/after (khi chạy traditional trước, optimized sau)
+
+Các thông số EXPLAIN cần chú ý:
 
 | Thông số | Ý nghĩa |
 |---|---|

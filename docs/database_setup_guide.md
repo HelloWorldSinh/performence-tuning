@@ -156,7 +156,12 @@ Script sẽ tạo các indexes:
 
 ## 9. Chạy indexing demo (Before vs After)
 
-Dùng menu trong app để demo từng bước trước/sau khi có index:
+Dùng menu trong app để demo từng bước trước/sau khi có index. Khi chạy menu 4–9, CLI sẽ hiển thị:
+- Raw EXPLAIN ANALYZE output
+- Parsed Execution Summary (bảng ASCII tóm tắt metrics)
+- EXPLAIN Meaning (bảng giải thích từng tham số)
+- Plan Interpretation (nhận xét human-readable)
+- Performance comparison (so sánh before/after)
 
 ```
 ===== SQL Performance Tuning CLI =====
