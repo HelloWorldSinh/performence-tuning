@@ -381,7 +381,21 @@ Khi chạy các menu indexing, output sẽ hiển thị kết quả `EXPLAIN (AN
 
 ### Sửa lỗi: Connection to localhost:5432 refused
 
-Đây là lỗi thường gặp nhất. Nguyên nhân: Docker Desktop chưa mở hoặc container PostgreSQL đã bị stop.
+Đây là lỗi thường gặp nhất. Khi chạy `.\gradlew.bat bootRun` mà thấy:
+
+```
+Failed to obtain JDBC Connection
+Connection to localhost:5432 refused
+```
+
+và app **không hiện CLI menu** → nghĩa là PostgreSQL chưa hoạt động.
+
+**Nguyên nhân thường gặp:**
+- Docker Desktop chưa chạy (chưa mở ứng dụng Docker Desktop)
+- Container PostgreSQL `perf-postgres` đã bị stop
+- Port 5432 chưa mở
+- Sai cấu hình trong `application.properties`
+- Database `"e-commerce"` chưa tồn tại
 
 **Bước 1 — Kiểm tra Docker Desktop đang chạy:**
 
