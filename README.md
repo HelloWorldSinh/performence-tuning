@@ -5,12 +5,11 @@
 Ứng dụng Java Spring Boot CLI phục vụ môn **Performance Tuning SQL / Database Performance**. Project demo và so sánh hiệu năng các kỹ thuật tối ưu database trên hệ thống e-commerce quy mô lớn:
 
 - **JDBC Batch Processing** vs Single Insert
-- **B-Tree Index** — index đơn cột cho foreign key lookup
-- **Composite Index** — index nhiều cột cho filter + sort
-- **Covering Index** — `INCLUDE` clause cho Index Only Scan
-- **EXPLAIN / EXPLAIN ANALYZE** — phân tích execution plan
+- **B-Tree Index** — single-column index for foreign key lookup
+- **Composite Index** — multi-column index for filter + sort
+- **Covering Index** — `INCLUDE` clause for Index Only Scan
+- **EXPLAIN / EXPLAIN ANALYZE** — execution plan analysis
 - **Full/Parallel Seq Scan** vs **Index Scan / Index Only Scan**
-- **Offset Pagination** vs **Keyset (Cursor) Pagination**
 
 ## Công nghệ sử dụng
 
@@ -42,7 +41,7 @@ performence-tuning-team/
 │   │   ├── BenchmarkRunner.java          # CLI menu chính (CommandLineRunner)
 │   │   └── DataGenerator.java            # Tạo dữ liệu giả bằng DataFaker
 │   └── benchmark/
-│       └── QueryBenchmarkRunner.java     # Benchmark indexing & pagination
+│       └── QueryBenchmarkRunner.java     # Benchmark indexing (B-Tree, Composite, Covering)
 ├── src/main/resources/
 │   └── application.properties            # Cấu hình kết nối PostgreSQL
 └── docs/
@@ -58,7 +57,7 @@ performence-tuning-team/
 |---|---|
 | `DataGenerator.java` | Tạo dữ liệu giả (users, products, orders, order_items) bằng thư viện DataFaker |
 | `BenchmarkRunner.java` | CLI menu chính — hiển thị menu, điều khiển benchmark, nạp dữ liệu |
-| `QueryBenchmarkRunner.java` | Chạy benchmark indexing (B-Tree, Composite, Covering) và pagination (Offset vs Keyset) |
+| `QueryBenchmarkRunner.java` | Chạy benchmark indexing (B-Tree, Composite, Covering) với EXPLAIN ANALYZE |
 | `sql/00_create_schema.sql` | Tạo schema 4 bảng với primary key, foreign key, check constraint |
 | `sql/01_fill_order_status.sql` | Phân phối lại status order sau khi nạp data |
 | `sql/02_create_indexes.sql` | Tạo 9 indexes phục vụ benchmark |
@@ -207,9 +206,6 @@ App chạy dạng **interactive CLI** — hiển thị menu, người dùng nh�
 
 10. Run full Indexing comparison report
 
-===== Pagination Demo =====
-11. Offset pagination vs Keyset pagination
-
 0. Exit
 ```
 
@@ -226,7 +222,6 @@ Bước 7.  Menu 4 → Menu 5 — Demo B-Tree Index (before → after)
 Bước 8.  Menu 6 → Menu 7 — Demo Composite Index (before → after)
 Bước 9.  Menu 8 → Menu 9 — Demo Covering Index (before → after)
 Bước 10. Menu 10 — Chạy toàn bộ indexing comparison report
-Bước 11. Menu 11 — So sánh Offset vs Keyset pagination
 ```
 
 > **Quan trọng:** Muốn so sánh before/after, phải chạy **Traditional (menu 4/6/8) trước**, rồi mới chạy **Optimized (menu 5/7/9) sau**. Menu 5/7/9 sẽ tự động so sánh với kết quả trước đó.
@@ -301,37 +296,6 @@ Chạy lần lượt menu 4→5→6→7→8→9 và in bảng tổng hợp:
 ```
 
 > Số liệu benchmark có thể thay đổi tùy phần cứng. Xem chi tiết tại `docs/indexing_report.md`.
-
-## Pagination demo (Menu 11)
-
-So sánh 2 cách phân trang trên bảng `orders` (3M rows):
-
-### Offset Pagination
-
-```sql
-SELECT ... FROM orders ORDER BY order_id LIMIT 20 OFFSET 999900;
-```
-
-- PostgreSQL phải scan qua tất cả rows trước offset
-- Chậm dần khi offset tăng lớn
-
-### Keyset (Cursor) Pagination
-
-```sql
-SELECT ... FROM orders WHERE order_id > 999900 ORDER BY order_id LIMIT 20;
-```
-
-- Chỉ scan đúng số rows cần thiết
-- Tốc độ ổn định bất kể vị trí
-
-Kết quả thực tế (3M orders):
-
-| Vị trí | OFFSET (ms) | KEYSET (ms) |
-|---|---|---|
-| Page 1 | ~1.0 | ~1.3 |
-| Page 496 | ~11.0 | ~1.0 |
-| Page 4996 | ~10.3 | ~1.0 |
-| Page 49996 | ~107.0 | ~1.0 |
 
 ## EXPLAIN / EXPLAIN ANALYZE
 
@@ -441,5 +405,5 @@ Kết quả mong đợi: `TcpTestSucceeded: True`
 ## Trạng thái hiện tại
 
 - **Branch:** `KhangNM17`
-- **Phần triển khai:** Indexing demo (B-Tree, Composite, Covering) + Pagination comparison
+- **Phần triển khai:** Indexing demo (B-Tree, Composite, Covering)
 - **Chưa merge main**

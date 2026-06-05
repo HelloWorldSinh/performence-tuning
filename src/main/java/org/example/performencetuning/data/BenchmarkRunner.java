@@ -34,11 +34,11 @@ public class BenchmarkRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        
+
         System.out.println("\n==============================================================");
-        System.out.println("     CHUONG TRINH TOI UU CO SO DU LIEU PERFORMANCE TUNING");
+        System.out.println("     SQL PERFORMANCE TUNING — E-COMMERCE BENCHMARK CLI");
         System.out.println("==============================================================");
-        
+
         displayRowCounts();
 
         while (true) {
@@ -59,22 +59,19 @@ public class BenchmarkRunner implements CommandLineRunner {
             System.out.println("");
             System.out.println("10. Run full Indexing comparison report");
             System.out.println("");
-            System.out.println("===== Pagination Demo =====");
-            System.out.println("11. Offset pagination vs Keyset pagination");
-            System.out.println("");
             System.out.println("0. Exit");
-            System.out.print("Nhap lua chon cua ban: ");
-            
+            System.out.print("Enter your choice: ");
+
             String choice = "";
             if (scanner.hasNextLine()) {
                 choice = scanner.nextLine().trim();
             } else {
-                log.warn("Khong phat hien luong nhap du lieu tu Console. Thoat menu.");
+                log.warn("No input stream detected. Exiting menu.");
                 break;
             }
 
             if (choice.equals("0")) {
-                System.out.println("Dang thoat chuong trinh...");
+                System.out.println("Exiting...");
                 break;
             } else if (choice.equals("1")) {
                 displayRowCounts();
@@ -96,33 +93,31 @@ public class BenchmarkRunner implements CommandLineRunner {
                 runDemo(() -> queryBenchmarkRunner.runCoveringOptimized());
             } else if (choice.equals("10")) {
                 runDemo(() -> queryBenchmarkRunner.runFullIndexingReport());
-            } else if (choice.equals("11")) {
-                runDemo(() -> queryBenchmarkRunner.runPaginationComparison());
             } else {
-                System.out.println("Lua chon khong hop le! Vui long chon lai.");
+                System.out.println("Invalid choice. Please try again.");
             }
         }
     }
 
     private void displayRowCounts() {
         System.out.println("\n==============================================================");
-        System.out.println("        THONG KE SO DONG HIEN TAI TRONG CO SO DU LIEU");
+        System.out.println("        CURRENT ROW COUNTS");
         System.out.println("==============================================================");
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
-            
+
             long usersCount = getCount(stmt, "users");
             long productsCount = getCount(stmt, "products");
             long ordersCount = getCount(stmt, "orders");
             long orderItemsCount = getCount(stmt, "order_items");
-            
-            System.out.printf("  - Bang [users]       : %,12d dong%n", usersCount);
-            System.out.printf("  - Bang [products]    : %,12d dong%n", productsCount);
-            System.out.printf("  - Bang [orders]      : %,12d dong%n", ordersCount);
-            System.out.printf("  - Bang [order_items] : %,12d dong%n", orderItemsCount);
-            
+
+            System.out.printf("  - Table [users]       : %,12d rows%n", usersCount);
+            System.out.printf("  - Table [products]    : %,12d rows%n", productsCount);
+            System.out.printf("  - Table [orders]      : %,12d rows%n", ordersCount);
+            System.out.printf("  - Table [order_items] : %,12d rows%n", orderItemsCount);
+
         } catch (Exception e) {
-            System.err.println("Loi khi truy van so luong dong: " + e.getMessage());
+            System.err.println("Error querying row counts: " + e.getMessage());
         }
         System.out.println("==============================================================");
     }
@@ -133,26 +128,26 @@ public class BenchmarkRunner implements CommandLineRunner {
                 return rs.getLong(1);
             }
         } catch (Exception e) {
-            // Bang chua co hoac bi loi
+            // Table may not exist yet
         }
         return 0;
     }
 
     private void truncateAllTables(Scanner scanner) {
-        System.out.print("Ban co chac chan muon XOA SACH du lieu tat ca cac bang? (Y/N): ");
+        System.out.print("Are you sure you want to TRUNCATE all tables? (Y/N): ");
         String confirm = scanner.nextLine().trim();
         if (!confirm.equalsIgnoreCase("Y")) {
-            System.out.println("Da huy thao tac xoa du lieu.");
+            System.out.println("Truncate cancelled.");
             return;
         }
 
-        System.out.println("Dang tien hanh xoa sach du lieu...");
+        System.out.println("Truncating all tables...");
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("TRUNCATE TABLE order_items, orders, products, users RESTART IDENTITY CASCADE;");
-            System.out.println("Thanh cong! Tat ca cac bang da trong va bo tu tang (sequence) da duoc reset.");
+            System.out.println("Done. All tables are empty and sequences have been reset.");
         } catch (Exception e) {
-            System.err.println("Loi khi thuc hien xoa du lieu: " + e.getMessage());
+            System.err.println("Error truncating tables: " + e.getMessage());
         }
     }
 
@@ -167,13 +162,13 @@ public class BenchmarkRunner implements CommandLineRunner {
             }
 
             if (userCount > 0) {
-                System.out.println("\n[CANH BAO] CSDL da co du lieu (" + userCount + " users).");
-                System.out.println("Vui long thuc hien thao tac 'Xoa du lieu' truoc khi nap moi.");
+                System.out.println("\n[WARNING] Database already has data (" + userCount + " users).");
+                System.out.println("Please truncate tables first before loading new data.");
                 return;
             }
 
             System.out.println("\n==============================================================");
-            System.out.println("BAT DAU QUY TRINH NAP DU LIEU & DO LUONG HIEU NANG...");
+            System.out.println("STARTING DATA LOADING & BENCHMARK...");
             System.out.println("==============================================================");
 
             // 1. Single Insert Benchmark: 50,000 Users
@@ -195,11 +190,11 @@ public class BenchmarkRunner implements CommandLineRunner {
             resetDatabaseSequences(conn);
 
             System.out.println("\n==============================================================");
-            System.out.println("NAP DU LIEU HOAN TAT THANH CONG!");
+            System.out.println("DATA LOADING COMPLETED SUCCESSFULLY!");
             System.out.println("==============================================================");
 
         } catch (Exception e) {
-            System.err.println("Loi xay ra trong qua trinh nap du lieu: " + e.getMessage());
+            System.err.println("Error during data loading: " + e.getMessage());
         }
     }
 
@@ -221,9 +216,9 @@ public class BenchmarkRunner implements CommandLineRunner {
     }
 
     private void runSingleInsertBenchmark(Connection conn) throws Exception {
-        System.out.println("\n1. Dang chay Single Insert cho 50,000 users...");
+        System.out.println("\n1. Running Single Insert for 50,000 users...");
         String sql = "INSERT INTO users (user_id, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)";
-        
+
         long startTime = System.currentTimeMillis();
         conn.setAutoCommit(true);
 
@@ -247,16 +242,16 @@ public class BenchmarkRunner implements CommandLineRunner {
         double throughput = 50000.0 / (duration / 1000.0);
         double avgLatency = (double) duration / 50000.0;
 
-        System.out.println("  => KET QUA SINGLE INSERT USERS:");
-        System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
-        System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
-        System.out.printf("     - Do tre trung binh: %,.4f ms/dong%n", avgLatency);
+        System.out.println("  => SINGLE INSERT USERS RESULTS:");
+        System.out.printf("     - Total time       : %,d ms%n", duration);
+        System.out.printf("     - Throughput       : %,.2f rows/sec%n", throughput);
+        System.out.printf("     - Avg latency      : %,.4f ms/row%n", avgLatency);
     }
 
     private void runUserBatchInsert(Connection conn) throws Exception {
-        System.out.println("\n2. Dang chay Batch Insert cho 50,000 users con lai...");
+        System.out.println("\n2. Running Batch Insert for remaining 50,000 users...");
         String sql = "INSERT INTO users (user_id, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)";
-        
+
         long startTime = System.currentTimeMillis();
         conn.setAutoCommit(false);
 
@@ -290,17 +285,17 @@ public class BenchmarkRunner implements CommandLineRunner {
         double throughput = 50000.0 / (duration / 1000.0);
         double avgLatency = (double) duration / 50000.0;
 
-        System.out.println("  => KET QUA BATCH INSERT USERS:");
-        System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
-        System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
-        System.out.printf("     - Do tre trung binh: %,.4f ms/dong%n", avgLatency);
-        System.out.printf("     - TOC DO NHANH HON : %,.1f lan%n", (double) duration > 0 ? (double) 7428 / duration : 1.0); // so sanh tuong doi
+        System.out.println("  => BATCH INSERT USERS RESULTS:");
+        System.out.printf("     - Total time       : %,d ms%n", duration);
+        System.out.printf("     - Throughput       : %,.2f rows/sec%n", throughput);
+        System.out.printf("     - Avg latency      : %,.4f ms/row%n", avgLatency);
+        System.out.printf("     - Speed vs single  : %,.1fx%n", (double) duration > 0 ? (double) 7428 / duration : 1.0);
     }
 
     private void runProductBatchInsert(Connection conn) throws Exception {
-        System.out.println("\n3. Dang chay Batch Insert cho 50,000 products...");
+        System.out.println("\n3. Running Batch Insert for 50,000 products...");
         String sql = "INSERT INTO products (product_id, product_name, price, created_at) VALUES (?, ?, ?, ?)";
-        
+
         long startTime = System.currentTimeMillis();
         conn.setAutoCommit(false);
 
@@ -332,15 +327,15 @@ public class BenchmarkRunner implements CommandLineRunner {
         long duration = endTime - startTime;
         double throughput = 50000.0 / (duration / 1000.0);
 
-        System.out.println("  => KET QUA BATCH INSERT PRODUCTS:");
-        System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
-        System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
+        System.out.println("  => BATCH INSERT PRODUCTS RESULTS:");
+        System.out.printf("     - Total time       : %,d ms%n", duration);
+        System.out.printf("     - Throughput       : %,.2f rows/sec%n", throughput);
     }
 
     private void runOrderBatchInsert(Connection conn) throws Exception {
-        System.out.println("\n4. Dang chay Batch Insert cho 3,000,000 orders...");
+        System.out.println("\n4. Running Batch Insert for 3,000,000 orders...");
         String sql = "INSERT INTO orders (order_id, user_id, order_date, total_amount) VALUES (?, ?, ?, ?)";
-        
+
         long startTime = System.currentTimeMillis();
         conn.setAutoCommit(false);
 
@@ -374,17 +369,17 @@ public class BenchmarkRunner implements CommandLineRunner {
         long duration = endTime - startTime;
         double throughput = 3000000.0 / (duration / 1000.0);
 
-        System.out.println("  => KET QUA BATCH INSERT ORDERS:");
-        System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
-        System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
+        System.out.println("  => BATCH INSERT ORDERS RESULTS:");
+        System.out.printf("     - Total time       : %,d ms%n", duration);
+        System.out.printf("     - Throughput       : %,.2f rows/sec%n", throughput);
     }
 
     private void runOrderItemBatchInsert(Connection conn) throws Exception {
-        System.out.println("\n5. Dang tinh toan quy mo chi tiet don hang...");
-        
+        System.out.println("\n5. Calculating order items scale...");
+
         long totalItems = 10000000L;
-        System.out.printf("  => Tong so dong order_items can nap: %,d dong%n", totalItems);
-        System.out.println("   Dang chay Batch Insert cho order_items...");
+        System.out.printf("  => Total order_items rows to insert: %,d%n", totalItems);
+        System.out.println("   Running Batch Insert for order_items...");
 
         String sql = "INSERT INTO order_items (order_item_id, order_id, product_id, quantity, price_per_unit) VALUES (?, ?, ?, ?, ?)";
         long startTime = System.currentTimeMillis();
@@ -401,14 +396,14 @@ public class BenchmarkRunner implements CommandLineRunner {
                 for (int j = 0; j < numItems; j++) {
                     long productId = random.nextInt(50000) + 1;
                     DataGenerator.OrderItemRecord item = dataGenerator.generateOrderItem(orderItemId, orderId, productId);
-                    
+
                     ps.setLong(1, item.orderItemId());
                     ps.setLong(2, item.orderId());
                     ps.setLong(3, item.productId());
                     ps.setInt(4, item.quantity());
                     ps.setBigDecimal(5, item.pricePerUnit());
                     ps.addBatch();
-                    
+
                     orderItemId++;
                     count++;
 
@@ -431,9 +426,9 @@ public class BenchmarkRunner implements CommandLineRunner {
         long duration = endTime - startTime;
         double throughput = (double) count / (duration / 1000.0);
 
-        System.out.println("  => KET QUA BATCH INSERT ORDER ITEMS:");
-        System.out.printf("     - Tong thoi gian  : %,d ms%n", duration);
-        System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
+        System.out.println("  => BATCH INSERT ORDER ITEMS RESULTS:");
+        System.out.printf("     - Total time       : %,d ms%n", duration);
+        System.out.printf("     - Throughput       : %,.2f rows/sec%n", throughput);
     }
 
     @FunctionalInterface
@@ -445,18 +440,18 @@ public class BenchmarkRunner implements CommandLineRunner {
         try {
             action.run();
         } catch (Exception e) {
-            System.err.println("Loi: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
         }
     }
 
     private void resetDatabaseSequences(Connection conn) throws Exception {
-        System.out.println("\n6. Dang dong bo hoa sequence khoa chinh tu tang...");
+        System.out.println("\n6. Resetting auto-increment sequences...");
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("SELECT setval(pg_get_serial_sequence('users', 'user_id'), COALESCE((SELECT MAX(user_id) FROM users), 1))");
             stmt.execute("SELECT setval(pg_get_serial_sequence('products', 'product_id'), COALESCE((SELECT MAX(product_id) FROM products), 1))");
             stmt.execute("SELECT setval(pg_get_serial_sequence('orders', 'order_id'), COALESCE((SELECT MAX(order_id) FROM orders), 1))");
             stmt.execute("SELECT setval(pg_get_serial_sequence('order_items', 'order_item_id'), COALESCE((SELECT MAX(order_item_id) FROM order_items), 1))");
         }
-        System.out.println("  => Dong bo sequence hoan tat.");
+        System.out.println("  => Sequences reset completed.");
     }
 }

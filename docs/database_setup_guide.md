@@ -176,9 +176,6 @@ Dùng menu trong app để demo từng bước trước/sau khi có index:
 
 10. Run full Indexing comparison report
 
-===== Pagination Demo =====
-11. Offset pagination vs Keyset pagination
-
 0. Exit
 ```
 
@@ -213,35 +210,7 @@ Chạy lần lượt 4 → 5 → 6 → 7 → 8 → 9, in bảng tổng hợp.
 
 **Kết luận:** Index giúp các truy vấn lookup chính nhanh hơn hàng trăm đến hàng nghìn lần; covering index giúp query projection dùng `Index Only Scan`.
 
-### Menu 9: So sanh phan trang OFFSET vs CURSOR
-
-So sánh 2 cách phân trang:
-
-**OFFSET pagination:**
-```sql
-SELECT * FROM orders ORDER BY order_id LIMIT 20 OFFSET 999900;
-```
-- Đơn giản nhưng chậm dần khi offset lớn
-- PostgreSQL phải scan qua tất cả rows trước offset
-
-**CURSOR (keyset) pagination:**
-```sql
-SELECT * FROM orders WHERE order_id > 999900 ORDER BY order_id LIMIT 20;
-```
-- Tốc độ ổn định bất kể vị trí
-- Chỉ scan đúng số rows cần thiết
-
-Kết quả thực tế (3M orders):
-
-| Vị trí | OFFSET (ms) | CURSOR (ms) |
-|--------|-------------|-------------|
-| Page 1 (offset 0) | 1.0 | 1.3 |
-| Page 496 (offset 9,900) | 11.0 | 1.0 |
-| Page 4996 (offset 99,900) | 10.3 | 1.0 |
-| Page 49996 (offset 999,900) | 107.0 | 1.0 |
-
-**Kết luận:** OFFSET pagination chậm dần khi offset lớn (107ms tại page 50k).
-CURSOR pagination tốc độ ổn định ~1ms bất kể vị trí.
+> Pagination (Offset vs Keyset) is out of scope for this indexing task.
 
 ## 10. Xóa dữ liệu (nếu cần nạp lại)
 
