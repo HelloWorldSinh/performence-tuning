@@ -493,14 +493,27 @@ Indexes can consume more storage than the table itself.
 | 9 | Covering — Optimized query WITH covering index |
 | 10 | Run full Indexing comparison report |
 
+### Repeated Benchmark Runs
+
+When selecting menu 4–9, the CLI prompts:
+
+```
+Enter number of benchmark runs [default: 1]:
+```
+
+- **1 run (default):** Prints full raw EXPLAIN ANALYZE, parsed summary, meaning table, and plan interpretation.
+- **Multiple runs:** Prints full raw EXPLAIN only for the first run. Subsequent runs print one-line timing summaries. At the end, prints **Benchmark Statistics** table with min, max, avg, median, p95, and standard deviation.
+- **Menu 10 (full report):** Default is 3 runs per case. Collects stats for all 6 cases and prints a comparison summary.
+
 ### CLI Output Format
 
 When running menu 4–9, the CLI prints:
 
 1. **Business problem** — what the query is trying to do
 2. **SQL** — the actual query being tested
-3. **EXPLAIN ANALYZE raw output** — full PostgreSQL execution plan
+3. **EXPLAIN ANALYZE raw output** — full PostgreSQL execution plan (first run only when runs > 1)
 4. **Parsed Execution Summary** — ASCII table with key metrics (scan type, cost, rows, buffers, execution time)
 5. **EXPLAIN Meaning** — table explaining what each EXPLAIN parameter means in plain English
 6. **Plan Interpretation** — human-readable analysis of why the query is fast or slow
-7. **Performance comparison** — before/after timing and speedup (when running traditional then optimized)
+7. **Benchmark Statistics** — min/max/avg/median/p95/stddev (when runs > 1)
+8. **Performance comparison** — before/after timing and speedup (when running traditional then optimized)

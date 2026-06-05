@@ -80,19 +80,26 @@ public class BenchmarkRunner implements CommandLineRunner {
             } else if (choice.equals("3")) {
                 truncateAllTables(scanner);
             } else if (choice.equals("4")) {
-                runDemo(() -> queryBenchmarkRunner.runBTreeTraditional());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runBTreeTraditional(runs));
             } else if (choice.equals("5")) {
-                runDemo(() -> queryBenchmarkRunner.runBTreeOptimized());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runBTreeOptimized(runs));
             } else if (choice.equals("6")) {
-                runDemo(() -> queryBenchmarkRunner.runCompositeTraditional());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runCompositeTraditional(runs));
             } else if (choice.equals("7")) {
-                runDemo(() -> queryBenchmarkRunner.runCompositeOptimized());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runCompositeOptimized(runs));
             } else if (choice.equals("8")) {
-                runDemo(() -> queryBenchmarkRunner.runCoveringTraditional());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runCoveringTraditional(runs));
             } else if (choice.equals("9")) {
-                runDemo(() -> queryBenchmarkRunner.runCoveringOptimized());
+                int runs = promptRunCount(scanner);
+                runDemo(() -> queryBenchmarkRunner.runCoveringOptimized(runs));
             } else if (choice.equals("10")) {
-                runDemo(() -> queryBenchmarkRunner.runFullIndexingReport());
+                int runs = promptRunCount(scanner, 3);
+                runDemo(() -> queryBenchmarkRunner.runFullIndexingReport(runs));
             } else {
                 System.out.println("Invalid choice. Please try again.");
             }
@@ -441,6 +448,41 @@ public class BenchmarkRunner implements CommandLineRunner {
             action.run();
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Prompt user for number of benchmark runs (default: 1).
+     */
+    private int promptRunCount(Scanner scanner) {
+        return promptRunCount(scanner, 1);
+    }
+
+    /**
+     * Prompt user for number of benchmark runs with a custom default.
+     */
+    private int promptRunCount(Scanner scanner, int defaultRuns) {
+        System.out.printf("Enter number of benchmark runs [default: %d]: ", defaultRuns);
+        String input = scanner.nextLine().trim();
+
+        if (input.isEmpty()) {
+            return defaultRuns;
+        }
+
+        try {
+            int runs = Integer.parseInt(input);
+            if (runs < 1) {
+                System.out.println("Minimum is 1. Using 1.");
+                return 1;
+            }
+            if (runs > 20) {
+                System.out.println("Maximum is 20. Using 20.");
+                return 20;
+            }
+            return runs;
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid number. Using default: " + defaultRuns);
+            return defaultRuns;
         }
     }
 

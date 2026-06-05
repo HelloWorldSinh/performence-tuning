@@ -156,11 +156,14 @@ Script sẽ tạo các indexes:
 
 ## 9. Chạy indexing demo (Before vs After)
 
-Dùng menu trong app để demo từng bước trước/sau khi có index. Khi chạy menu 4–9, CLI sẽ hiển thị:
-- Raw EXPLAIN ANALYZE output
+Dùng menu trong app để demo từng bước trước/sau khi có index. Khi chạy menu 4–9, CLI sẽ hỏi số lần chạy benchmark. Nếu chạy nhiều lần (>1), CLI sẽ in thống kê min/max/avg/median/p95/stddev.
+
+Output hiển thị:
+- Raw EXPLAIN ANALYZE output (chỉ lần đầu khi chạy nhiều lần)
 - Parsed Execution Summary (bảng ASCII tóm tắt metrics)
 - EXPLAIN Meaning (bảng giải thích từng tham số)
 - Plan Interpretation (nhận xét human-readable)
+- Benchmark Statistics (min/max/avg/median/p95/stddev khi chạy nhiều lần)
 - Performance comparison (so sánh before/after)
 
 ```

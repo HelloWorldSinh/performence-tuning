@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,21 +35,33 @@ public class QueryBenchmarkRunner {
     };
 
     // Store last results for before/after comparison
-    private ExplainResult lastBTreeBefore;
-    private ExplainResult lastBTreeAfter;
-    private ExplainResult lastCompositeBefore;
-    private ExplainResult lastCompositeAfter;
-    private ExplainResult lastCoveringBefore;
-    private ExplainResult lastCoveringAfter;
+    private BenchmarkStats lastBTreeBeforeStats;
+    private BenchmarkStats lastBTreeAfterStats;
+    private BenchmarkStats lastCompositeBeforeStats;
+    private BenchmarkStats lastCompositeAfterStats;
+    private BenchmarkStats lastCoveringBeforeStats;
+    private BenchmarkStats lastCoveringAfterStats;
 
     // ========================================================================
-    // Public API — Split Before/After Demos
+    // Public API — Split Before/After Demos (with repeated runs support)
     // ========================================================================
+
+    // --- Backward-compatible no-arg methods (default: 1 run) ---
+
+    public void runBTreeTraditional() throws Exception { runBTreeTraditional(1); }
+    public void runBTreeOptimized() throws Exception { runBTreeOptimized(1); }
+    public void runCompositeTraditional() throws Exception { runCompositeTraditional(1); }
+    public void runCompositeOptimized() throws Exception { runCompositeOptimized(1); }
+    public void runCoveringTraditional() throws Exception { runCoveringTraditional(1); }
+    public void runCoveringOptimized() throws Exception { runCoveringOptimized(1); }
+    public void runFullIndexingReport() throws Exception { runFullIndexingReport(1); }
+
+    // --- Main methods with repeated runs support ---
 
     /**
      * Menu 4: B-Tree Traditional — WITHOUT index on order_items(order_id)
      */
-    public void runBTreeTraditional() throws Exception {
+    public void runBTreeTraditional(int runs) throws Exception {
         String sql = "SELECT order_item_id, order_id, product_id, quantity, price_per_unit\n" +
                 "FROM order_items\nWHERE order_id = 100;";
 
@@ -72,21 +85,17 @@ public class QueryBenchmarkRunner {
             System.out.println("\n[Index dropped: idx_order_items_order_id]");
         }
 
-        lastBTreeBefore = runExplainAnalyze(sql);
+        lastBTreeBeforeStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : lastBTreeBefore.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(lastBTreeBefore);
+        ExplainResult firstResult = lastBTreeBeforeStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, true, false);
 
-        printPlanSummary(lastBTreeBefore, false, null);
+        printPlanSummary(firstResult, false, null);
 
         System.out.println("=".repeat(70));
     }
@@ -94,7 +103,7 @@ public class QueryBenchmarkRunner {
     /**
      * Menu 5: B-Tree Optimized — WITH index on order_items(order_id)
      */
-    public void runBTreeOptimized() throws Exception {
+    public void runBTreeOptimized(int runs) throws Exception {
         String sql = "SELECT order_item_id, order_id, product_id, quantity, price_per_unit\n" +
                 "FROM order_items\nWHERE order_id = 100;";
 
@@ -121,32 +130,27 @@ public class QueryBenchmarkRunner {
         System.out.println("\nSQL:");
         System.out.println(sql);
 
-        ExplainResult afterResult = runExplainAnalyze(sql);
-        lastBTreeAfter = afterResult;
+        lastBTreeAfterStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : afterResult.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(afterResult);
+        ExplainResult firstResult = lastBTreeAfterStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, false, false);
 
-        String indexUsed = printPlanSummary(afterResult, true,
+        String indexUsed = printPlanSummary(firstResult, true,
                 "B-Tree index on order_id allows direct lookup of items belonging to an order.");
 
-        printBeforeAfterComparison(lastBTreeBefore, afterResult, indexUsed);
+        printStatsComparison("B-Tree", lastBTreeBeforeStats, lastBTreeAfterStats);
         System.out.println("=".repeat(70));
     }
 
     /**
      * Menu 6: Composite Traditional — WITHOUT composite index on orders(status, order_date)
      */
-    public void runCompositeTraditional() throws Exception {
+    public void runCompositeTraditional(int runs) throws Exception {
         String sql = "SELECT order_id, user_id, order_date, total_amount, status\n" +
                 "FROM orders\nWHERE status = 'PENDING'\nORDER BY order_date DESC\nLIMIT 20;";
 
@@ -169,21 +173,17 @@ public class QueryBenchmarkRunner {
             System.out.println("\n[Index dropped: idx_orders_status_date, idx_orders_pending]");
         }
 
-        lastCompositeBefore = runExplainAnalyze(sql);
+        lastCompositeBeforeStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : lastCompositeBefore.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(lastCompositeBefore);
+        ExplainResult firstResult = lastCompositeBeforeStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, true, false);
 
-        printPlanSummary(lastCompositeBefore, false, null);
+        printPlanSummary(firstResult, false, null);
 
         System.out.println("=".repeat(70));
     }
@@ -191,7 +191,7 @@ public class QueryBenchmarkRunner {
     /**
      * Menu 7: Composite Optimized — WITH composite index on orders(status, order_date)
      */
-    public void runCompositeOptimized() throws Exception {
+    public void runCompositeOptimized(int runs) throws Exception {
         String sql = "SELECT order_id, user_id, order_date, total_amount, status\n" +
                 "FROM orders\nWHERE status = 'PENDING'\nORDER BY order_date DESC\nLIMIT 20;";
 
@@ -218,32 +218,27 @@ public class QueryBenchmarkRunner {
         System.out.println("\nSQL:");
         System.out.println(sql);
 
-        ExplainResult afterResult = runExplainAnalyze(sql);
-        lastCompositeAfter = afterResult;
+        lastCompositeAfterStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : afterResult.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(afterResult);
+        ExplainResult firstResult = lastCompositeAfterStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, false, false);
 
-        String indexUsed = printPlanSummary(afterResult, true,
+        String indexUsed = printPlanSummary(firstResult, true,
                 "Composite index supports both WHERE status and ORDER BY order_date DESC in a single index scan.");
 
-        printBeforeAfterComparison(lastCompositeBefore, afterResult, indexUsed);
+        printStatsComparison("Composite", lastCompositeBeforeStats, lastCompositeAfterStats);
         System.out.println("=".repeat(70));
     }
 
     /**
      * Menu 8: Covering Traditional — WITH normal composite index but WITHOUT covering index
      */
-    public void runCoveringTraditional() throws Exception {
+    public void runCoveringTraditional(int runs) throws Exception {
         String sql = "SELECT user_id, order_date, total_amount, status\n" +
                 "FROM orders\nWHERE user_id = 42\nORDER BY order_date DESC\nLIMIT 20;";
 
@@ -268,21 +263,17 @@ public class QueryBenchmarkRunner {
             System.out.println("[Index kept: idx_orders_user_date (normal composite)]");
         }
 
-        lastCoveringBefore = runExplainAnalyze(sql);
+        lastCoveringBeforeStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : lastCoveringBefore.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(lastCoveringBefore);
+        ExplainResult firstResult = lastCoveringBeforeStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, true, false);
 
-        printPlanSummary(lastCoveringBefore, false, null);
+        printPlanSummary(firstResult, false, null);
 
         System.out.println("=".repeat(70));
     }
@@ -290,7 +281,7 @@ public class QueryBenchmarkRunner {
     /**
      * Menu 9: Covering Optimized — WITH covering index INCLUDE(total_amount, status)
      */
-    public void runCoveringOptimized() throws Exception {
+    public void runCoveringOptimized(int runs) throws Exception {
         String sql = "SELECT user_id, order_date, total_amount, status\n" +
                 "FROM orders\nWHERE user_id = 42\nORDER BY order_date DESC\nLIMIT 20;";
 
@@ -321,85 +312,55 @@ public class QueryBenchmarkRunner {
         System.out.println("\nSQL:");
         System.out.println(sql);
 
-        ExplainResult afterResult = runExplainAnalyze(sql);
-        lastCoveringAfter = afterResult;
+        lastCoveringAfterStats = runBenchmarkMultipleTimes(sql, runs);
 
-        System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT:");
-        for (String line : afterResult.outputLines) {
-            System.out.println("  " + line);
-        }
-
-        ExplainSummary summary = parseExplainOutput(afterResult);
+        ExplainResult firstResult = lastCoveringAfterStats.lastExplainResult;
+        ExplainSummary summary = parseExplainOutput(firstResult);
         System.out.println("\nParsed Execution Summary:");
         printExecutionSummary(summary);
         System.out.println("\nEXPLAIN Meaning:");
         printExplainMeaning(summary);
         printPlanInterpretation(summary, false, true);
 
-        String indexUsed = printPlanSummary(afterResult, true,
+        String indexUsed = printPlanSummary(firstResult, true,
                 "Covering index contains all columns the query needs. PostgreSQL can use\n" +
                 "  Index Only Scan. If Heap Fetches = 0, no table access is needed.");
 
-        printBeforeAfterComparison(lastCoveringBefore, afterResult, indexUsed);
+        printStatsComparison("Covering", lastCoveringBeforeStats, lastCoveringAfterStats);
         System.out.println("=".repeat(70));
     }
 
     /**
      * Menu 10: Run full indexing comparison report (4 -> 5 -> 6 -> 7 -> 8 -> 9)
      */
-    public void runFullIndexingReport() throws Exception {
+    public void runFullIndexingReport(int runs) throws Exception {
         System.out.println("\n" + "=".repeat(70));
         System.out.println("  FULL INDEXING COMPARISON REPORT");
+        System.out.printf("  (%d run(s) per case)%n", runs);
         System.out.println("=".repeat(70));
 
         // Run all 6 steps sequentially
-        runBTreeTraditional();
-        runBTreeOptimized();
-        runCompositeTraditional();
-        runCompositeOptimized();
-        runCoveringTraditional();
-        runCoveringOptimized();
+        runBTreeTraditional(runs);
+        runBTreeOptimized(runs);
+        runCompositeTraditional(runs);
+        runCompositeOptimized(runs);
+        runCoveringTraditional(runs);
+        runCoveringOptimized(runs);
 
-        // Print summary table
+        // Print full summary table with stats
         System.out.println("\n" + "=".repeat(70));
-        System.out.println("  SUMMARY TABLE");
+        System.out.println("  FULL INDEXING COMPARISON SUMMARY");
         System.out.println("=".repeat(70));
         System.out.println();
-        System.out.printf("| %-10s | %-25s | %-20s | %-20s | %10s | %10s | %8s | %-25s |%n",
-                "Index Type", "Business Problem", "Traditional Plan", "Optimized Plan",
-                "Before ms", "After ms", "Speedup", "Index Used");
-        System.out.println("|" + "-".repeat(12) + "|" + "-".repeat(27) + "|" + "-".repeat(22) + "|" +
-                "-".repeat(22) + "|" + "-".repeat(12) + "|" + "-".repeat(12) + "|" + "-".repeat(10) + "|" + "-".repeat(27) + "|");
-
-        printSummaryRow("B-Tree", "Order item lookup",
-                lastBTreeBefore, lastBTreeAfter, "idx_order_items_order_id");
-        printSummaryRow("Composite", "Pending orders",
-                lastCompositeBefore, lastCompositeAfter, "idx_orders_status_date");
-        printSummaryRow("Covering", "User order history",
-                lastCoveringBefore, lastCoveringAfter, "idx_orders_user_date_covering");
+        printFullComparisonSummary(runs);
 
         System.out.println("\n" + "=".repeat(70));
         System.out.println("  FULL INDEXING COMPARISON REPORT COMPLETED");
         System.out.println("=".repeat(70));
     }
 
-    private void printSummaryRow(String indexType, String problem,
-                                 ExplainResult before, ExplainResult after,
-                                 String indexName) {
-        String beforePlan = extractScanType(before);
-        String afterPlan = extractScanType(after);
-        double beforeMs = before != null ? before.executionTimeMs : 0;
-        double afterMs = after != null ? after.executionTimeMs : 0;
-        String speedup = "N/A";
-        if (beforeMs > 0 && afterMs > 0) {
-            speedup = String.format("%.1fx", beforeMs / afterMs);
-        }
-        System.out.printf("| %-10s | %-25s | %-20s | %-20s | %10.1f | %10.1f | %8s | %-25s |%n",
-                indexType, problem, beforePlan, afterPlan, beforeMs, afterMs, speedup, indexName);
-    }
-
     /**
-     * Run all indexing demos sequentially.
+     * Run all indexing demos sequentially (backward-compatible).
      */
     public void runAllIndexingDemos() throws Exception {
         runBTreeTraditional();
@@ -507,6 +468,21 @@ public class QueryBenchmarkRunner {
         String workersLaunched = "N/A";
         String indexCond = "N/A";
         String filter = "N/A";
+    }
+
+    /**
+     * Holds benchmark statistics from multiple runs.
+     */
+    static class BenchmarkStats {
+        int runs;
+        List<Double> timesMs;
+        double min;
+        double max;
+        double avg;
+        double median;
+        double p95;
+        double stddev;
+        ExplainResult lastExplainResult; // raw EXPLAIN from the last run (for scan type, index used, etc.)
     }
 
     private ExplainResult runExplainAnalyze(String sql) {
@@ -1008,5 +984,210 @@ public class QueryBenchmarkRunner {
         if (indexUsed != null && !"N/A".equals(indexUsed)) {
             System.out.println("Index used: " + indexUsed);
         }
+    }
+
+    // ========================================================================
+    // Benchmark statistics (repeated runs)
+    // ========================================================================
+
+    /**
+     * Run EXPLAIN ANALYZE multiple times and collect statistics.
+     * Prints raw EXPLAIN only for the first run; subsequent runs print one-line summaries.
+     */
+    private BenchmarkStats runBenchmarkMultipleTimes(String sql, int runs) throws Exception {
+        BenchmarkStats stats = new BenchmarkStats();
+        stats.runs = runs;
+        stats.timesMs = new ArrayList<>();
+
+        System.out.printf("%nRunning benchmark %d time(s)...%n", runs);
+
+        for (int i = 1; i <= runs; i++) {
+            ExplainResult result = runExplainAnalyze(sql);
+            stats.timesMs.add(result.executionTimeMs);
+
+            if (i == 1) {
+                // First run: print full raw EXPLAIN
+                System.out.println("\nEXPLAIN ANALYZE RAW OUTPUT (Run 1):");
+                for (String line : result.outputLines) {
+                    System.out.println("  " + line);
+                }
+                stats.lastExplainResult = result;
+            } else {
+                // Subsequent runs: one-line summary
+                System.out.printf("Run %d: %.3f ms%n", i, result.executionTimeMs);
+                stats.lastExplainResult = result;
+            }
+        }
+
+        // Calculate and print statistics
+        calculateStats(stats);
+        if (runs > 1) {
+            printBenchmarkStats("Benchmark Statistics", stats);
+            printRunTimes(stats);
+        }
+
+        return stats;
+    }
+
+    /**
+     * Calculate min, max, avg, median, p95, stddev from collected times.
+     */
+    private void calculateStats(BenchmarkStats stats) {
+        List<Double> sorted = new ArrayList<>(stats.timesMs);
+        Collections.sort(sorted);
+
+        stats.min = sorted.get(0);
+        stats.max = sorted.get(sorted.size() - 1);
+
+        // Average
+        double sum = 0;
+        for (double t : sorted) sum += t;
+        stats.avg = sum / sorted.size();
+
+        // Median
+        int n = sorted.size();
+        if (n % 2 == 1) {
+            stats.median = sorted.get(n / 2);
+        } else {
+            stats.median = (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2.0;
+        }
+
+        // P95
+        int p95Idx = (int) Math.ceil(n * 0.95) - 1;
+        if (p95Idx < 0) p95Idx = 0;
+        if (p95Idx >= n) p95Idx = n - 1;
+        stats.p95 = sorted.get(p95Idx);
+
+        // Standard deviation
+        double variance = 0;
+        for (double t : sorted) {
+            variance += (t - stats.avg) * (t - stats.avg);
+        }
+        stats.stddev = Math.sqrt(variance / sorted.size());
+    }
+
+    /**
+     * Print benchmark statistics as an ASCII table.
+     */
+    private void printBenchmarkStats(String title, BenchmarkStats stats) {
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Metric", "Value"});
+        rows.add(new String[]{"Runs", String.valueOf(stats.runs)});
+        rows.add(new String[]{"Min", String.format("%.3f ms", stats.min)});
+        rows.add(new String[]{"Max", String.format("%.3f ms", stats.max)});
+        rows.add(new String[]{"Avg", String.format("%.3f ms", stats.avg)});
+        rows.add(new String[]{"Median", String.format("%.3f ms", stats.median)});
+        rows.add(new String[]{"P95", String.format("%.3f ms", stats.p95)});
+        rows.add(new String[]{"Std Dev", String.format("%.3f ms", stats.stddev)});
+
+        System.out.println("\n" + title + ":");
+        printTable("", rows);
+    }
+
+    /**
+     * Print individual run times.
+     */
+    private void printRunTimes(BenchmarkStats stats) {
+        System.out.println("\nExecution times:");
+        for (int i = 0; i < stats.timesMs.size(); i++) {
+            System.out.printf("  Run %d: %.3f ms%n", i + 1, stats.timesMs.get(i));
+        }
+    }
+
+    /**
+     * Print before/after stats comparison with speedup.
+     */
+    private void printStatsComparison(String indexType, BenchmarkStats before, BenchmarkStats after) {
+        System.out.println("\n==================================================");
+        System.out.println("Performance comparison (" + indexType + "):");
+        System.out.println("==================================================");
+
+        if (before == null) {
+            if (after != null) {
+                printBenchmarkStats("Optimized WITH Index", after);
+            }
+            System.out.println("\n[No baseline result found. Please run the traditional demo first.]");
+            return;
+        }
+
+        if (before.runs == 1 && after.runs == 1) {
+            // Single run: use simple before/after format
+            System.out.printf("Before: %.3f ms%n", before.avg);
+            System.out.printf("After:  %.3f ms%n", after.avg);
+            if (before.avg > 0 && after.avg > 0) {
+                System.out.printf("Speedup: %.1fx%n", before.avg / after.avg);
+            }
+            return;
+        }
+
+        // Multi-run: print comparison table
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Metric", "Without Index", "With Index", "Speedup"});
+
+        rows.add(new String[]{"Avg",
+                String.format("%.3f ms", before.avg),
+                String.format("%.3f ms", after.avg),
+                before.avg > 0 && after.avg > 0 ? String.format("%.1fx", before.avg / after.avg) : "N/A"});
+
+        rows.add(new String[]{"Min",
+                String.format("%.3f ms", before.min),
+                String.format("%.3f ms", after.min),
+                before.min > 0 && after.min > 0 ? String.format("%.1fx", before.min / after.min) : "N/A"});
+
+        rows.add(new String[]{"Max",
+                String.format("%.3f ms", before.max),
+                String.format("%.3f ms", after.max),
+                before.max > 0 && after.max > 0 ? String.format("%.1fx", before.max / after.max) : "N/A"});
+
+        rows.add(new String[]{"Median",
+                String.format("%.3f ms", before.median),
+                String.format("%.3f ms", after.median),
+                before.median > 0 && after.median > 0 ? String.format("%.1fx", before.median / after.median) : "N/A"});
+
+        if (before.runs > 1 && after.runs > 1) {
+            rows.add(new String[]{"P95",
+                    String.format("%.3f ms", before.p95),
+                    String.format("%.3f ms", after.p95),
+                    before.p95 > 0 && after.p95 > 0 ? String.format("%.1fx", before.p95 / after.p95) : "N/A"});
+        }
+
+        System.out.println();
+        printTable("", rows);
+
+        // Print individual run times for both
+        System.out.println("\nWithout Index — execution times:");
+        for (int i = 0; i < before.timesMs.size(); i++) {
+            System.out.printf("  Run %d: %.3f ms%n", i + 1, before.timesMs.get(i));
+        }
+
+        System.out.println("\nWith Index — execution times:");
+        for (int i = 0; i < after.timesMs.size(); i++) {
+            System.out.printf("  Run %d: %.3f ms%n", i + 1, after.timesMs.get(i));
+        }
+    }
+
+    /**
+     * Print the full comparison summary for menu 10.
+     */
+    private void printFullComparisonSummary(int runs) {
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Index Type", "Runs", "Before Avg", "After Avg", "Speedup"});
+
+        addSummaryRow(rows, "B-Tree", runs, lastBTreeBeforeStats, lastBTreeAfterStats);
+        addSummaryRow(rows, "Composite", runs, lastCompositeBeforeStats, lastCompositeAfterStats);
+        addSummaryRow(rows, "Covering", runs, lastCoveringBeforeStats, lastCoveringAfterStats);
+
+        printTable("", rows);
+    }
+
+    private void addSummaryRow(List<String[]> rows, String indexType, int runs,
+                               BenchmarkStats before, BenchmarkStats after) {
+        String beforeAvg = before != null ? String.format("%.3f ms", before.avg) : "N/A";
+        String afterAvg = after != null ? String.format("%.3f ms", after.avg) : "N/A";
+        String speedup = "N/A";
+        if (before != null && after != null && before.avg > 0 && after.avg > 0) {
+            speedup = String.format("%.1fx", before.avg / after.avg);
+        }
+        rows.add(new String[]{indexType, String.valueOf(runs), beforeAvg, afterAvg, speedup});
     }
 }
