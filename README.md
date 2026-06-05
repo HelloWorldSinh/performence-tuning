@@ -369,6 +369,7 @@ Khi chạy các menu indexing, output sẽ hiển thị kết quả `EXPLAIN (AN
 
 | Lỗi | Nguyên nhân | Cách khắc phục |
 |---|---|---|
+| `Connection to localhost:5432 refused` | Docker Desktop chưa chạy hoặc container đã stop | Xem hướng dẫn bên dưới |
 | `could not connect to server` | PostgreSQL chưa chạy | Start Docker container hoặc PostgreSQL service |
 | `database "e-commerce" does not exist` | Chưa tạo database | `CREATE DATABASE "e-commerce"` trong psql |
 | `relation "users" does not exist` | Chưa chạy schema | Chạy `sql/00_create_schema.sql` |
@@ -377,6 +378,51 @@ Khi chạy các menu indexing, output sẽ hiển thị kết quả `EXPLAIN (AN
 | `docker: name already in container` | Container đã tồn tại | `docker start perf-postgres` hoặc `docker rm perf-postgres` rồi tạo lại |
 | Build fail: `No matching toolchains` | Chưa cài Java 21 | Cài JDK 21 (Adoptium, Oracle, v.v.) |
 | Menu 5/7/9: `Chua co ket qua before` | Chưa chạy menu traditional trước | Chạy menu 4/6/8 trước, rồi mới chạy 5/7/9 |
+
+### Sửa lỗi: Connection to localhost:5432 refused
+
+Đây là lỗi thường gặp nhất. Nguyên nhân: Docker Desktop chưa mở hoặc container PostgreSQL đã bị stop.
+
+**Bước 1 — Kiểm tra Docker Desktop đang chạy:**
+
+Mở Docker Desktop, đợi icon trên system tray hiển thị trạng thái "Docker Desktop is running".
+
+**Bước 2 — Kiểm tra container tồn tại:**
+
+```powershell
+docker ps -a --filter name=perf-postgres
+```
+
+Nếu container chưa tồn tại, tạo mới:
+
+```powershell
+docker run --name perf-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=123456789 `
+  -e POSTGRES_DB=e-commerce `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+**Bước 3 — Start container nếu đã tồn tại nhưng bị stop:**
+
+```powershell
+docker start perf-postgres
+```
+
+**Bước 4 — Kiểm tra port 5432 đã mở:**
+
+```powershell
+Test-NetConnection localhost -Port 5432
+```
+
+Kết quả mong đợi: `TcpTestSucceeded: True`
+
+**Bước 5 — Chạy lại app:**
+
+```powershell
+.\gradlew.bat bootRun
+```
 
 ## Trạng thái hiện tại
 
