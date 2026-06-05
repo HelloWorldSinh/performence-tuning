@@ -7,8 +7,8 @@
 --
 --   Run this script to get a realistic distribution:
 --     ~80% DELIVERED
---     ~15% PENDING
---     ~5%  CANCELED
+--     ~19% PENDING
+--     ~1%  CANCELED
 --
 -- Safe to re-run: redistributes all rows each time.
 -- =============================================================================

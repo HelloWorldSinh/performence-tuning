@@ -152,6 +152,7 @@ Script sẽ tạo các indexes:
 | `idx_orders_user_date` | orders | user_id, order_date | "Đơn hàng gần đây của tôi" |
 | `idx_orders_status_date` | orders | status, order_date | "Đơn hàng PENDING theo ngày" |
 | `idx_orders_pending` | orders | order_date (partial) | Chỉ index đơn PENDING |
+| `idx_orders_user_date_covering` | orders | user_id, order_date INCLUDE total_amount, status | Covering index cho Index Only Scan |
 
 ## 9. Chạy benchmark truy van
 
@@ -167,18 +168,20 @@ Xóa tất cả indexes phụ, chạy benchmark, hiển thị:
 
 Tạo indexes, chạy lại cùng các benchmark, so sánh với baseline.
 
-**Kết quả thực tế (3M orders, 10M order_items):**
+**Kết quả benchmark tóm tắt (3M orders, 10M order_items):**
+
+> Detailed benchmark uses `docs/indexing_report.md` as source of truth.
 
 | Truy vấn | Không index (ms) | Có index (ms) | Tốc độ nhanh hơn |
 |----------|------------------|---------------|------------------|
-| Orders by user_id | 108.0 | 1.6 | 67x |
-| Orders by status = 'PENDING' | 135.6 | 1.0 | 135x |
-| Orders by date range | 126.2 | 1.8 | 70x |
-| Order items by order_id | 226.8 | 1.0 | 226x |
-| Join: orders + order_items | 407.8 | 1.6 | 254x |
-| Pending orders (recent) | 138.6 | 1.2 | 115x |
+| Orders by user_id | 290.5 | 0.39 | 745x |
+| Orders by status = 'PENDING' | 151.3 | 0.14 | 1081x |
+| Orders by date range | 123.9 | 0.24 | 516x |
+| Order items by order_id | 252.3 | 0.10 | 2523x |
+| Join: orders + order_items | 611.2 | 0.56 | 1091x |
+| Covering index / Index Only Scan | 0.110 | 0.062 | 1.8x |
 
-**Kết luận:** Index giúp truy vấn nhanh hơn 67-254 lần.
+**Kết luận:** Index giúp các truy vấn lookup chính nhanh hơn hàng trăm đến hàng nghìn lần; covering index giúp query projection dùng `Index Only Scan`.
 
 ### Menu 6: So sanh phan trang OFFSET vs CURSOR
 

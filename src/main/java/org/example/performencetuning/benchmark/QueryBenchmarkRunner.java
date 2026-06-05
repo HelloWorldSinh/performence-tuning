@@ -25,8 +25,17 @@ public class QueryBenchmarkRunner {
         "idx_orders_order_date",
         "idx_orders_user_date",
         "idx_orders_status_date",
-        "idx_orders_pending"
+        "idx_orders_pending",
+        "idx_orders_user_date_covering"
     };
+
+    private static final String COVERING_INDEX_SQL =
+        "CREATE INDEX IF NOT EXISTS idx_orders_user_date_covering " +
+        "ON orders(user_id, order_date DESC) INCLUDE (total_amount, status)";
+
+    private static final String COVERING_QUERY =
+        "SELECT user_id, order_date, total_amount, status " +
+        "FROM orders WHERE user_id = 42 ORDER BY order_date DESC LIMIT 20";
 
     // ========================================================================
     // Public API
@@ -55,6 +64,7 @@ public class QueryBenchmarkRunner {
         System.out.println("==============================================================");
 
         createAllIndexes();
+        runCoveringIndexComparison();
         runAllQueryBenchmarks();
     }
 
@@ -151,6 +161,11 @@ public class QueryBenchmarkRunner {
             "SELECT * FROM orders WHERE status = 'PENDING' ORDER BY order_date DESC LIMIT 20",
             5);
 
+        // Query 8: Covering index / Index Only Scan
+        benchmarkNoParams("Covering index: user order history",
+            COVERING_QUERY,
+            5);
+
         // Show EXPLAIN ANALYZE for key queries
         System.out.println("\n" + "=".repeat(70));
         System.out.println("EXPLAIN ANALYZE - Cac truy van quan trong");
@@ -167,6 +182,31 @@ public class QueryBenchmarkRunner {
             "oi.product_id, oi.quantity, oi.price_per_unit " +
             "FROM orders o JOIN order_items oi ON o.order_id = oi.order_id " +
             "WHERE o.user_id = 42 ORDER BY o.order_date DESC LIMIT 50");
+
+        explainQuery("Covering index: user order history",
+            COVERING_QUERY);
+    }
+
+    private void runCoveringIndexComparison() throws Exception {
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("COVERING INDEX COMPARISON - Index Scan vs Index Only Scan");
+        System.out.println("=".repeat(70));
+
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            System.out.println("\n[Before] Without covering index (regular index may need heap access)");
+            stmt.execute("DROP INDEX IF EXISTS idx_orders_user_date_covering");
+            stmt.execute("ANALYZE orders");
+            benchmarkNoParams("Covering query before INCLUDE", COVERING_QUERY, 5);
+            explainQuery("Before covering index", COVERING_QUERY);
+
+            System.out.println("\n[After] With covering index idx_orders_user_date_covering");
+            stmt.execute(COVERING_INDEX_SQL);
+            stmt.execute("ANALYZE orders");
+            benchmarkNoParams("Covering query after INCLUDE", COVERING_QUERY, 5);
+            explainQuery("After covering index", COVERING_QUERY);
+        }
     }
 
     // ========================================================================
@@ -356,28 +396,31 @@ public class QueryBenchmarkRunner {
              Statement stmt = conn.createStatement()) {
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)");
-            System.out.println("  [1/8] idx_orders_user_id");
+            System.out.println("  [1/9] idx_orders_user_id");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)");
-            System.out.println("  [2/8] idx_order_items_order_id");
+            System.out.println("  [2/9] idx_order_items_order_id");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id)");
-            System.out.println("  [3/8] idx_order_items_product_id");
+            System.out.println("  [3/9] idx_order_items_product_id");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)");
-            System.out.println("  [4/8] idx_orders_status");
+            System.out.println("  [4/9] idx_orders_status");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_order_date ON orders(order_date)");
-            System.out.println("  [5/8] idx_orders_order_date");
+            System.out.println("  [5/9] idx_orders_order_date");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_user_date ON orders(user_id, order_date DESC)");
-            System.out.println("  [6/8] idx_orders_user_date");
+            System.out.println("  [6/9] idx_orders_user_date");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_status_date ON orders(status, order_date DESC)");
-            System.out.println("  [7/8] idx_orders_status_date");
+            System.out.println("  [7/9] idx_orders_status_date");
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_pending ON orders(order_date DESC) WHERE status = 'PENDING'");
-            System.out.println("  [8/8] idx_orders_pending (partial)");
+            System.out.println("  [8/9] idx_orders_pending (partial)");
+
+            stmt.execute(COVERING_INDEX_SQL);
+            System.out.println("  [9/9] idx_orders_user_date_covering (covering)");
 
             stmt.execute("ANALYZE orders");
             stmt.execute("ANALYZE order_items");
