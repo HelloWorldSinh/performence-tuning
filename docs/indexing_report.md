@@ -23,7 +23,10 @@ Phân tích và đánh giá hiệu quả của các index trong hệ thống e-c
 
 ```bash
 .\gradlew.bat bootRun
-# Chọn menu 4-7 để chạy từng case, menu 8 để chạy tất cả
+# Menu 4/5: B-Tree before/after
+# Menu 6/7: Composite before/after
+# Menu 8/9: Covering before/after
+# Menu 10: Run full comparison report
 ```
 
 ### Chi tiết từng case

@@ -154,9 +154,9 @@ Script sẽ tạo các indexes:
 | `idx_orders_pending` | orders | order_date (partial) | Chỉ index đơn PENDING |
 | `idx_orders_user_date_covering` | orders | user_id, order_date INCLUDE total_amount, status | Covering index cho Index Only Scan |
 
-## 9. Chạy indexing demo (Business Cases)
+## 9. Chạy indexing demo (Before vs After)
 
-Dùng menu trong app để demo từng bài toán nghiệp vụ:
+Dùng menu trong app để demo từng bước trước/sau khi có index:
 
 ```
 ===== SQL Performance Tuning CLI =====
@@ -164,42 +164,52 @@ Dùng menu trong app để demo từng bài toán nghiệp vụ:
 2. Load sample data
 3. Truncate all tables
 
-===== Indexing Demo =====
-4. Case 1: User order history - traditional vs optimized
-5. Case 2: Pending orders - traditional vs optimized
-6. Case 3: Order item lookup - traditional vs optimized
-7. Case 4: Covering index - Index Scan vs Index Only Scan
-8. Run all indexing demos
+===== Indexing Demo: Before vs After =====
+4. B-Tree Index - Traditional query WITHOUT index
+5. B-Tree Index - Optimized query WITH index
+
+6. Composite Index - Traditional query WITHOUT index
+7. Composite Index - Optimized query WITH index
+
+8. Covering Index - Traditional query WITHOUT covering index
+9. Covering Index - Optimized query WITH covering index
+
+10. Run full Indexing comparison report
 
 ===== Pagination Demo =====
-9. Offset vs Keyset pagination comparison
+11. Offset pagination vs Keyset pagination
 
 0. Exit
 ```
 
-### Menu 4-7: Chạy từng case
+### Menu 4/5: B-Tree Index trước/sau
 
-Mỗi case sẽ:
-1. Nêu bài toán nghiệp vụ
-2. Chạy SQL truyền thống + EXPLAIN ANALYZE (sau khi drop index liên quan)
-3. Nêu vấn đề
-4. Tạo index tối ưu
-5. Chạy SQL tối ưu + EXPLAIN ANALYZE
-6. So sánh Before/After ms + Speedup
-7. Giải thích execution plan
+- **Menu 4:** Drop `idx_order_items_order_id`, chạy EXPLAIN ANALYZE trên `order_items WHERE order_id = 100`
+- **Menu 5:** Tạo `idx_order_items_order_id`, chạy lại, so sánh Before/After
 
-### Menu 8: Chạy tất cả 4 cases
+### Menu 6/7: Composite Index trước/sau
+
+- **Menu 6:** Drop `idx_orders_status_date`, `idx_orders_pending`, chạy EXPLAIN ANALYZE trên `orders WHERE status = 'PENDING'`
+- **Menu 7:** Tạo `idx_orders_status_date`, chạy lại, so sánh Before/After
+
+### Menu 8/9: Covering Index trước/sau
+
+- **Menu 8:** Drop `idx_orders_user_date_covering`, giữ `idx_orders_user_date`, chạy EXPLAIN ANALYZE
+- **Menu 9:** Tạo `idx_orders_user_date_covering` + `VACUUM ANALYZE`, chạy lại, kiểm tra `Heap Fetches = 0`
+
+### Menu 10: Run full Indexing comparison report
+
+Chạy lần lượt 4 → 5 → 6 → 7 → 8 → 9, in bảng tổng hợp.
 
 **Kết quả benchmark tóm tắt (3M orders, 10M order_items):**
 
 > Detailed benchmark uses `docs/indexing_report.md` as source of truth.
 
-| Case | Business Problem | Before (ms) | After (ms) | Speedup |
-|------|-----------------|-------------|------------|---------|
-| 1 | User order history | ~290 | ~0.4 | 745x |
-| 2 | Pending orders | ~151 | ~0.14 | 1081x |
-| 3 | Order item lookup | ~252 | ~0.10 | 2523x |
-| 4 | Covering index | ~0.11 | ~0.06 | Index Only Scan |
+| Index Type | Business Problem | Before (ms) | After (ms) | Speedup |
+|------------|-----------------|-------------|------------|---------|
+| B-Tree | Order item lookup | ~252 | ~0.10 | 2523x |
+| Composite | Pending orders | ~151 | ~0.14 | 1081x |
+| Covering | User order history | ~0.11 | ~0.06 | Index Only Scan |
 
 **Kết luận:** Index giúp các truy vấn lookup chính nhanh hơn hàng trăm đến hàng nghìn lần; covering index giúp query projection dùng `Index Only Scan`.
 

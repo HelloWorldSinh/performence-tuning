@@ -1,22 +1,33 @@
 # Thuyết trình — B-Tree / Composite / Covering Index
 
-## Demo CLI — 4 Business Cases
+## Demo CLI — Before vs After
 
-Ứng dụng CLI cho phép chạy từng bài toán nghiệp vụ để demo trực tiếp hiệu quả của indexing. Chạy `.\gradlew.bat bootRun` rồi chọn menu 4-8.
+Ứng dụng CLI cho phép chạy từng bước trước/sau khi có index. Chạy `.\gradlew.bat bootRun`.
 
-### Case 1: User Order History — Composite Index
+```
+===== Indexing Demo: Before vs After =====
+4. B-Tree Index - Traditional query WITHOUT index
+5. B-Tree Index - Optimized query WITH index
+6. Composite Index - Traditional query WITHOUT index
+7. Composite Index - Optimized query WITH index
+8. Covering Index - Traditional query WITHOUT covering index
+9. Covering Index - Optimized query WITH covering index
+10. Run full Indexing comparison report
+```
+
+### B-Tree Index (Menu 4/5) — Order Item Lookup
 
 | | |
 |---|---|
-| **Bài toán** | Người dùng muốn xem lịch sử đơn hàng gần đây |
-| **SQL truyền thống** | `SELECT ... FROM orders WHERE user_id=42 ORDER BY order_date DESC LIMIT 20` |
-| **Vấn đề** | Parallel Seq Scan + Sort — scan 3M rows, filter 999,991 rows |
-| **Tối ưu** | Composite index `(user_id, order_date DESC)` |
-| **Kết quả** | ~290ms → ~0.4ms (**745x nhanh hơn**) |
+| **Bài toán** | Khách xem chi tiết items của đơn hàng |
+| **SQL truyền thống** | `SELECT ... FROM order_items WHERE order_id=100` |
+| **Vấn đề** | Parallel Seq Scan — scan 10M rows |
+| **Tối ưu** | B-Tree index `(order_id)` |
+| **Kết quả** | ~252ms → ~0.1ms (**2523x nhanh hơn**) |
 | **EXPLAIN Before** | Parallel Seq Scan on orders |
 | **EXPLAIN After** | Index Scan using idx_orders_user_date |
 
-### Case 2: Pending Orders — Composite Index
+### Composite Index (Menu 6/7) — Pending Orders
 
 | | |
 |---|---|
@@ -28,19 +39,7 @@
 | **EXPLAIN Before** | Parallel Seq Scan on orders |
 | **EXPLAIN After** | Index Scan using idx_orders_status_date |
 
-### Case 3: Order Item Lookup — B-Tree Index
-
-| | |
-|---|---|
-| **Bài toán** | Khách xem chi tiết items của đơn hàng |
-| **SQL truyền thống** | `SELECT ... FROM order_items WHERE order_id=100` |
-| **Vấn đề** | Parallel Seq Scan — scan 10M rows |
-| **Tối ưu** | B-Tree index `(order_id)` |
-| **Kết quả** | ~252ms → ~0.1ms (**2523x nhanh hơn**) |
-| **EXPLAIN Before** | Parallel Seq Scan on order_items |
-| **EXPLAIN After** | Index Scan using idx_order_items_order_id |
-
-### Case 4: Covering Index — Index Only Scan
+### Covering Index (Menu 8/9) — User Order History
 
 | | |
 |---|---|

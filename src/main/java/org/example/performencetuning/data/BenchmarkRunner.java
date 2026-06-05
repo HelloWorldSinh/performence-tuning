@@ -47,15 +47,20 @@ public class BenchmarkRunner implements CommandLineRunner {
             System.out.println("2. Load sample data");
             System.out.println("3. Truncate all tables");
             System.out.println("");
-            System.out.println("===== Indexing Demo =====");
-            System.out.println("4. Case 1: User order history - traditional vs optimized");
-            System.out.println("5. Case 2: Pending orders - traditional vs optimized");
-            System.out.println("6. Case 3: Order item lookup - traditional vs optimized");
-            System.out.println("7. Case 4: Covering index - Index Scan vs Index Only Scan");
-            System.out.println("8. Run all indexing demos");
+            System.out.println("===== Indexing Demo: Before vs After =====");
+            System.out.println("4. B-Tree Index - Traditional query WITHOUT index");
+            System.out.println("5. B-Tree Index - Optimized query WITH index");
+            System.out.println("");
+            System.out.println("6. Composite Index - Traditional query WITHOUT index");
+            System.out.println("7. Composite Index - Optimized query WITH index");
+            System.out.println("");
+            System.out.println("8. Covering Index - Traditional query WITHOUT covering index");
+            System.out.println("9. Covering Index - Optimized query WITH covering index");
+            System.out.println("");
+            System.out.println("10. Run full Indexing comparison report");
             System.out.println("");
             System.out.println("===== Pagination Demo =====");
-            System.out.println("9. Offset vs Keyset pagination comparison");
+            System.out.println("11. Offset pagination vs Keyset pagination");
             System.out.println("");
             System.out.println("0. Exit");
             System.out.print("Nhap lua chon cua ban: ");
@@ -78,17 +83,21 @@ public class BenchmarkRunner implements CommandLineRunner {
             } else if (choice.equals("3")) {
                 truncateAllTables(scanner);
             } else if (choice.equals("4")) {
-                runCase(1);
+                runDemo(() -> queryBenchmarkRunner.runBTreeTraditional());
             } else if (choice.equals("5")) {
-                runCase(2);
+                runDemo(() -> queryBenchmarkRunner.runBTreeOptimized());
             } else if (choice.equals("6")) {
-                runCase(3);
+                runDemo(() -> queryBenchmarkRunner.runCompositeTraditional());
             } else if (choice.equals("7")) {
-                runCase(4);
+                runDemo(() -> queryBenchmarkRunner.runCompositeOptimized());
             } else if (choice.equals("8")) {
-                runAllIndexingDemos();
+                runDemo(() -> queryBenchmarkRunner.runCoveringTraditional());
             } else if (choice.equals("9")) {
-                runPaginationComparison();
+                runDemo(() -> queryBenchmarkRunner.runCoveringOptimized());
+            } else if (choice.equals("10")) {
+                runDemo(() -> queryBenchmarkRunner.runFullIndexingReport());
+            } else if (choice.equals("11")) {
+                runDemo(() -> queryBenchmarkRunner.runPaginationComparison());
             } else {
                 System.out.println("Lua chon khong hop le! Vui long chon lai.");
             }
@@ -427,32 +436,16 @@ public class BenchmarkRunner implements CommandLineRunner {
         System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
     }
 
-    private void runCase(int caseNumber) {
-        try {
-            switch (caseNumber) {
-                case 1 -> queryBenchmarkRunner.runCase1UserOrderHistory();
-                case 2 -> queryBenchmarkRunner.runCase2PendingOrders();
-                case 3 -> queryBenchmarkRunner.runCase3OrderItemLookup();
-                case 4 -> queryBenchmarkRunner.runCase4CoveringIndex();
-            }
-        } catch (Exception e) {
-            System.err.println("Loi khi chay case " + caseNumber + ": " + e.getMessage());
-        }
+    @FunctionalInterface
+    private interface DemoAction {
+        void run() throws Exception;
     }
 
-    private void runAllIndexingDemos() {
+    private void runDemo(DemoAction action) {
         try {
-            queryBenchmarkRunner.runAllIndexingDemos();
+            action.run();
         } catch (Exception e) {
-            System.err.println("Loi khi chay tat ca indexing demos: " + e.getMessage());
-        }
-    }
-
-    private void runPaginationComparison() {
-        try {
-            queryBenchmarkRunner.runPaginationComparison();
-        } catch (Exception e) {
-            System.err.println("Loi khi chay so sanh phan trang: " + e.getMessage());
+            System.err.println("Loi: " + e.getMessage());
         }
     }
 
