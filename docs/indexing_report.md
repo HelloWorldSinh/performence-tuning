@@ -6,6 +6,127 @@ Phân tích và đánh giá hiệu quả của các index trong hệ thống e-c
 
 ---
 
+## 0. Business Cases — Demo CLI
+
+Ứng dụng CLI cung cấp 4 bài toán nghiệp vụ để demo trực tiếp hiệu quả của indexing.
+
+### Bảng tổng hợp
+
+| Case | Business Problem | Traditional Approach | Problem | Optimization | Before ms | After ms | Speedup | EXPLAIN Before | EXPLAIN After |
+|---|---|---|---|---|---:|---:|---:|---|---|
+| 1 | User xem lịch sử đơn hàng gần đây | `SELECT ... FROM orders WHERE user_id=42 ORDER BY order_date DESC LIMIT 20` | Parallel Seq Scan + Sort — scan 3M rows | Composite index `(user_id, order_date DESC)` | ~290 | ~0.4 | ~745x | Parallel Seq Scan on orders, Rows Removed by Filter: 999,991 | Index Scan using idx_orders_user_date |
+| 2 | Admin xem đơn PENDING mới nhất | `SELECT ... FROM orders WHERE status='PENDING' ORDER BY order_date DESC LIMIT 20` | Parallel Seq Scan — scan 3M rows, filter ~570K | Composite index `(status, order_date DESC)` | ~151 | ~0.14 | ~1081x | Parallel Seq Scan on orders, Rows Removed by Filter: 809,975 | Index Scan using idx_orders_status_date |
+| 3 | Khách xem chi tiết items của đơn hàng | `SELECT ... FROM order_items WHERE order_id=100` | Parallel Seq Scan — scan 10M rows | B-Tree index `(order_id)` | ~252 | ~0.10 | ~2523x | Parallel Seq Scan on order_items, Rows Removed by Filter: 3,333,332 | Index Scan using idx_order_items_order_id |
+| 4 | Covering index cho lịch sử đơn hàng | `SELECT user_id, order_date, total_amount, status FROM orders WHERE user_id=42 ORDER BY order_date DESC LIMIT 20` | Index Scan vẫn phải truy cập heap | Covering index `INCLUDE (total_amount, status)` | ~0.11 | ~0.06 | ~1.8x | Index Scan using idx_orders_user_date | **Index Only Scan** using idx_orders_user_date_covering, **Heap Fetches: 0** |
+
+### Cách chạy
+
+```bash
+.\gradlew.bat bootRun
+# Chọn menu 4-7 để chạy từng case, menu 8 để chạy tất cả
+```
+
+### Chi tiết từng case
+
+#### Case 1 — Tìm đơn hàng của một user (Composite Index)
+
+**Bài toán nghiệp vụ:** Người dùng muốn xem lịch sử đơn hàng gần đây của mình.
+
+**Cách truyền thống:**
+```sql
+SELECT order_id, user_id, order_date, total_amount, status
+FROM orders
+WHERE user_id = 42
+ORDER BY order_date DESC
+LIMIT 20;
+```
+
+**Vấn đề:** Nếu không có index phù hợp, PostgreSQL phải quét nhiều dòng trong orders rồi sort lại theo order_date.
+
+**Cách tối ưu:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_orders_user_date
+ON orders(user_id, order_date DESC);
+```
+
+**Giải thích:** Composite index giúp filter theo user_id và trả kết quả đã được sắp xếp theo order_date DESC, tránh sort riêng.
+
+---
+
+#### Case 2 — Lọc đơn hàng theo trạng thái (Composite Index)
+
+**Bài toán nghiệp vụ:** Admin muốn xem các đơn hàng PENDING mới nhất để xử lý.
+
+**Cách truyền thống:**
+```sql
+SELECT order_id, user_id, order_date, total_amount, status
+FROM orders
+WHERE status = 'PENDING'
+ORDER BY order_date DESC
+LIMIT 20;
+```
+
+**Vấn đề:** status có nhiều dòng, nếu không có index theo status + order_date thì database phải scan/filter/sort nhiều dữ liệu.
+
+**Cách tối ưu:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_orders_status_date
+ON orders(status, order_date DESC);
+```
+
+**Giải thích:** Composite index hỗ trợ cả WHERE status và ORDER BY order_date DESC trong một index scan.
+
+---
+
+#### Case 3 — Lấy chi tiết items của một đơn hàng (B-Tree Index)
+
+**Bài toán nghiệp vụ:** Khi khách hàng mở chi tiết đơn hàng, hệ thống cần lấy toàn bộ sản phẩm trong order đó.
+
+**Cách truyền thống:**
+```sql
+SELECT order_item_id, order_id, product_id, quantity, price_per_unit
+FROM order_items
+WHERE order_id = 100;
+```
+
+**Vấn đề:** order_items có 10 triệu dòng, nếu không có index trên order_id thì phải scan toàn bảng.
+
+**Cách tối ưu:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+ON order_items(order_id);
+```
+
+**Giải thích:** B-Tree index trên order_id giúp tìm trực tiếp các item thuộc một order.
+
+---
+
+#### Case 4 — Covering Index cho lịch sử đơn hàng
+
+**Bài toán nghiệp vụ:** Màn hình lịch sử đơn hàng chỉ cần hiển thị user_id, order_date, total_amount, status.
+
+**Cách truyền thống:**
+```sql
+SELECT user_id, order_date, total_amount, status
+FROM orders
+WHERE user_id = 42
+ORDER BY order_date DESC
+LIMIT 20;
+```
+
+**Vấn đề:** Index thường có thể tìm đúng dòng, nhưng vẫn phải quay lại heap/table để lấy total_amount và status.
+
+**Cách tối ưu:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_orders_user_date_covering
+ON orders(user_id, order_date DESC)
+INCLUDE (total_amount, status);
+```
+
+**Giải thích:** Covering index chứa đủ cột query cần. PostgreSQL có thể dùng Index Only Scan. Nếu EXPLAIN hiển thị Heap Fetches = 0 thì chứng minh không cần đọc bảng chính.
+
+---
+
 ## 1. Danh sách Index đã tạo
 
 File: `sql/02_create_indexes.sql`

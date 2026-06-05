@@ -42,14 +42,22 @@ public class BenchmarkRunner implements CommandLineRunner {
         displayRowCounts();
 
         while (true) {
-            System.out.println("\n---------------- MENU THAO TAC ----------------");
-            System.out.println("1. Hien thi so luong dong cua cac bang");
-            System.out.println("2. Thuc hien nap du lieu (neu CSDL trong)");
-            System.out.println("3. Xoa sach du lieu (Truncate) tat ca cac bang");
-            System.out.println("4. Benchmark truy van KHONG co index (baseline)");
-            System.out.println("5. Benchmark truy van CO index");
-            System.out.println("6. So sanh phan trang: OFFSET vs CURSOR");
-            System.out.println("0. Thoat chuong trinh");
+            System.out.println("\n===== SQL Performance Tuning CLI =====");
+            System.out.println("1. Show row counts");
+            System.out.println("2. Load sample data");
+            System.out.println("3. Truncate all tables");
+            System.out.println("");
+            System.out.println("===== Indexing Demo =====");
+            System.out.println("4. Case 1: User order history - traditional vs optimized");
+            System.out.println("5. Case 2: Pending orders - traditional vs optimized");
+            System.out.println("6. Case 3: Order item lookup - traditional vs optimized");
+            System.out.println("7. Case 4: Covering index - Index Scan vs Index Only Scan");
+            System.out.println("8. Run all indexing demos");
+            System.out.println("");
+            System.out.println("===== Pagination Demo =====");
+            System.out.println("9. Offset vs Keyset pagination comparison");
+            System.out.println("");
+            System.out.println("0. Exit");
             System.out.print("Nhap lua chon cua ban: ");
             
             String choice = "";
@@ -70,10 +78,16 @@ public class BenchmarkRunner implements CommandLineRunner {
             } else if (choice.equals("3")) {
                 truncateAllTables(scanner);
             } else if (choice.equals("4")) {
-                runQueryBenchmarkWithoutIndexes();
+                runCase(1);
             } else if (choice.equals("5")) {
-                runQueryBenchmarkWithIndexes();
+                runCase(2);
             } else if (choice.equals("6")) {
+                runCase(3);
+            } else if (choice.equals("7")) {
+                runCase(4);
+            } else if (choice.equals("8")) {
+                runAllIndexingDemos();
+            } else if (choice.equals("9")) {
                 runPaginationComparison();
             } else {
                 System.out.println("Lua chon khong hop le! Vui long chon lai.");
@@ -413,19 +427,24 @@ public class BenchmarkRunner implements CommandLineRunner {
         System.out.printf("     - Toc do xu ly    : %,.2f dong/giay%n", throughput);
     }
 
-    private void runQueryBenchmarkWithoutIndexes() {
+    private void runCase(int caseNumber) {
         try {
-            queryBenchmarkRunner.runBenchmarksWithoutIndexes();
+            switch (caseNumber) {
+                case 1 -> queryBenchmarkRunner.runCase1UserOrderHistory();
+                case 2 -> queryBenchmarkRunner.runCase2PendingOrders();
+                case 3 -> queryBenchmarkRunner.runCase3OrderItemLookup();
+                case 4 -> queryBenchmarkRunner.runCase4CoveringIndex();
+            }
         } catch (Exception e) {
-            System.err.println("Loi khi chay benchmark: " + e.getMessage());
+            System.err.println("Loi khi chay case " + caseNumber + ": " + e.getMessage());
         }
     }
 
-    private void runQueryBenchmarkWithIndexes() {
+    private void runAllIndexingDemos() {
         try {
-            queryBenchmarkRunner.runBenchmarksWithIndexes();
+            queryBenchmarkRunner.runAllIndexingDemos();
         } catch (Exception e) {
-            System.err.println("Loi khi chay benchmark: " + e.getMessage());
+            System.err.println("Loi khi chay tat ca indexing demos: " + e.getMessage());
         }
     }
 

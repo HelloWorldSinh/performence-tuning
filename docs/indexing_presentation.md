@@ -1,5 +1,59 @@
 # Thuyết trình — B-Tree / Composite / Covering Index
 
+## Demo CLI — 4 Business Cases
+
+Ứng dụng CLI cho phép chạy từng bài toán nghiệp vụ để demo trực tiếp hiệu quả của indexing. Chạy `.\gradlew.bat bootRun` rồi chọn menu 4-8.
+
+### Case 1: User Order History — Composite Index
+
+| | |
+|---|---|
+| **Bài toán** | Người dùng muốn xem lịch sử đơn hàng gần đây |
+| **SQL truyền thống** | `SELECT ... FROM orders WHERE user_id=42 ORDER BY order_date DESC LIMIT 20` |
+| **Vấn đề** | Parallel Seq Scan + Sort — scan 3M rows, filter 999,991 rows |
+| **Tối ưu** | Composite index `(user_id, order_date DESC)` |
+| **Kết quả** | ~290ms → ~0.4ms (**745x nhanh hơn**) |
+| **EXPLAIN Before** | Parallel Seq Scan on orders |
+| **EXPLAIN After** | Index Scan using idx_orders_user_date |
+
+### Case 2: Pending Orders — Composite Index
+
+| | |
+|---|---|
+| **Bài toán** | Admin xem đơn PENDING mới nhất |
+| **SQL truyền thống** | `SELECT ... FROM orders WHERE status='PENDING' ORDER BY order_date DESC LIMIT 20` |
+| **Vấn đề** | Parallel Seq Scan — scan 3M rows, filter 809,975 rows |
+| **Tối ưu** | Composite index `(status, order_date DESC)` |
+| **Kết quả** | ~151ms → ~0.14ms (**1081x nhanh hơn**) |
+| **EXPLAIN Before** | Parallel Seq Scan on orders |
+| **EXPLAIN After** | Index Scan using idx_orders_status_date |
+
+### Case 3: Order Item Lookup — B-Tree Index
+
+| | |
+|---|---|
+| **Bài toán** | Khách xem chi tiết items của đơn hàng |
+| **SQL truyền thống** | `SELECT ... FROM order_items WHERE order_id=100` |
+| **Vấn đề** | Parallel Seq Scan — scan 10M rows |
+| **Tối ưu** | B-Tree index `(order_id)` |
+| **Kết quả** | ~252ms → ~0.1ms (**2523x nhanh hơn**) |
+| **EXPLAIN Before** | Parallel Seq Scan on order_items |
+| **EXPLAIN After** | Index Scan using idx_order_items_order_id |
+
+### Case 4: Covering Index — Index Only Scan
+
+| | |
+|---|---|
+| **Bài toán** | Màn hình lịch sử chỉ cần user_id, order_date, total_amount, status |
+| **SQL truyền thống** | `SELECT user_id, order_date, total_amount, status FROM orders WHERE user_id=42 ORDER BY order_date DESC LIMIT 20` |
+| **Vấn đề** | Index Scan vẫn phải quay lại heap để lấy total_amount, status |
+| **Tối ưu** | Covering index `INCLUDE (total_amount, status)` |
+| **Kết quả** | ~0.11ms → ~0.06ms (**Index Only Scan, Heap Fetches: 0**) |
+| **EXPLAIN Before** | Index Scan using idx_orders_user_date |
+| **EXPLAIN After** | **Index Only Scan** using idx_orders_user_date_covering, Heap Fetches: 0 |
+
+---
+
 ## Bản thuyết trình (2-3 phút, nói liên tục)
 
 ---

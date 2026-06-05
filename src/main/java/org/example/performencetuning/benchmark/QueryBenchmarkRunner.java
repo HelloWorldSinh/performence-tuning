@@ -442,4 +442,333 @@ public class QueryBenchmarkRunner {
             System.err.println("  Loi khi tao index: " + e.getMessage());
         }
     }
+
+    // ========================================================================
+    // Business Case Indexing Demos
+    // ========================================================================
+
+    /**
+     * Run all 4 business case demos sequentially.
+     */
+    public void runAllIndexingDemos() throws Exception {
+        runCase1UserOrderHistory();
+        runCase2PendingOrders();
+        runCase3OrderItemLookup();
+        runCase4CoveringIndex();
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("  HOAN TAT TAT CA 4 BUSINESS CASE DEMOS");
+        System.out.println("=".repeat(70));
+    }
+
+    /**
+     * Case 1: User Order History — Composite Index
+     */
+    public void runCase1UserOrderHistory() throws Exception {
+        String caseTitle = "CASE 1: User Order History";
+        String businessProblem = "Nguoi dung muon xem lich su don hang gan day cua minh.";
+        String traditionalSql = "SELECT order_id, user_id, order_date, total_amount, status\n" +
+                "FROM orders\nWHERE user_id = 42\nORDER BY order_date DESC\nLIMIT 20;";
+        String traditionalIssue = "Neu khong co index phu hop, PostgreSQL phai quet nhieu dong\n" +
+                "  trong orders roi sort lai theo order_date.";
+        String indexSql = "CREATE INDEX IF NOT EXISTS idx_orders_user_date\n" +
+                "ON orders(user_id, order_date DESC);";
+        String optimizedSql = traditionalSql; // Same query, different plan
+        String optimizedExplanation = "Composite index giup filter theo user_id va tra ket qua da duoc\n" +
+                "  sap xep theo order_date DESC, tranh sort rieng.";
+
+        String[] indexesToDrop = {"idx_orders_user_date", "idx_orders_user_date_covering"};
+
+        runBusinessCaseDemo(caseTitle, businessProblem, traditionalSql, traditionalIssue,
+                indexSql, optimizedSql, optimizedExplanation, indexesToDrop, traditionalSql);
+    }
+
+    /**
+     * Case 2: Pending Orders — Composite Index for status + date
+     */
+    public void runCase2PendingOrders() throws Exception {
+        String caseTitle = "CASE 2: Pending Orders";
+        String businessProblem = "Admin muon xem cac don hang PENDING moi nhat de xu ly.";
+        String traditionalSql = "SELECT order_id, user_id, order_date, total_amount, status\n" +
+                "FROM orders\nWHERE status = 'PENDING'\nORDER BY order_date DESC\nLIMIT 20;";
+        String traditionalIssue = "status co nhieu dong, neu khong co index theo status + order_date\n" +
+                "  thi database phai scan/filter/sort nhieu du lieu.";
+        String indexSql = "CREATE INDEX IF NOT EXISTS idx_orders_status_date\n" +
+                "ON orders(status, order_date DESC);";
+        String optimizedSql = traditionalSql;
+        String optimizedExplanation = "Composite index ho tro ca WHERE status va ORDER BY order_date DESC\n" +
+                "  trong mot index scan.";
+
+        String[] indexesToDrop = {"idx_orders_status_date", "idx_orders_pending"};
+
+        runBusinessCaseDemo(caseTitle, businessProblem, traditionalSql, traditionalIssue,
+                indexSql, optimizedSql, optimizedExplanation, indexesToDrop, traditionalSql);
+    }
+
+    /**
+     * Case 3: Order Item Lookup — B-Tree Index
+     */
+    public void runCase3OrderItemLookup() throws Exception {
+        String caseTitle = "CASE 3: Order Item Lookup";
+        String businessProblem = "Khi khach hang mo chi tiet don hang, he thong can lay toan bo\n" +
+                "  san pham trong order do.";
+        String traditionalSql = "SELECT order_item_id, order_id, product_id, quantity, price_per_unit\n" +
+                "FROM order_items\nWHERE order_id = 100;";
+        String traditionalIssue = "order_items co 10 trieu dong, neu khong co index tren order_id\n" +
+                "  thi phai scan toan bang.";
+        String indexSql = "CREATE INDEX IF NOT EXISTS idx_order_items_order_id\n" +
+                "ON order_items(order_id);";
+        String optimizedSql = traditionalSql;
+        String optimizedExplanation = "B-Tree index tren order_id giup tim truc tiep cac item thuoc mot order.";
+
+        String[] indexesToDrop = {"idx_order_items_order_id"};
+
+        runBusinessCaseDemo(caseTitle, businessProblem, traditionalSql, traditionalIssue,
+                indexSql, optimizedSql, optimizedExplanation, indexesToDrop, traditionalSql);
+    }
+
+    /**
+     * Case 4: Covering Index — Index Only Scan
+     */
+    public void runCase4CoveringIndex() throws Exception {
+        String caseTitle = "CASE 4: Covering Index";
+        String businessProblem = "Man hinh lich su don hang chi can hien thi user_id, order_date,\n" +
+                "  total_amount, status.";
+        String traditionalSql = "SELECT user_id, order_date, total_amount, status\n" +
+                "FROM orders\nWHERE user_id = 42\nORDER BY order_date DESC\nLIMIT 20;";
+        String traditionalIssue = "Index thuong co the tim dung dong, nhung van phai quay lai\n" +
+                "  heap/table de lay total_amount va status.";
+        String indexSql = "CREATE INDEX IF NOT EXISTS idx_orders_user_date_covering\n" +
+                "ON orders(user_id, order_date DESC)\nINCLUDE (total_amount, status);";
+        String optimizedSql = traditionalSql;
+        String optimizedExplanation = "Covering index chua du cot query can. PostgreSQL co the dung\n" +
+                "  Index Only Scan. Neu EXPLAIN hien thi Heap Fetches = 0 thi chung minh\n" +
+                "  khong can doc bang chinh.";
+
+        String[] indexesToDrop = {"idx_orders_user_date_covering"};
+
+        // For covering index, also VACUUM to ensure visibility map is updated
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println(caseTitle);
+        System.out.println("=".repeat(70));
+
+        System.out.println("\nBusiness problem:");
+        System.out.println("- " + businessProblem);
+
+        // --- Traditional approach ---
+        System.out.println("\n--------------------------------------------------");
+        System.out.println("Traditional approach:");
+        System.out.println("--------------------------------------------------");
+        System.out.println("SQL:");
+        System.out.println(traditionalSql);
+
+        // Drop covering index
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            for (String idx : indexesToDrop) {
+                stmt.execute("DROP INDEX IF EXISTS " + idx);
+            }
+            // Also drop the regular composite index to force Seq Scan
+            stmt.execute("DROP INDEX IF EXISTS idx_orders_user_date");
+            stmt.execute("ANALYZE orders");
+        }
+
+        ExplainResult beforeResult = runExplainAnalyze(traditionalSql);
+        System.out.println("\nEXPLAIN ANALYZE:");
+        for (String line : beforeResult.outputLines) {
+            System.out.println("  " + line);
+        }
+
+        System.out.println("\nProblem:");
+        System.out.println("- " + traditionalIssue);
+
+        // --- Optimized approach ---
+        System.out.println("\n--------------------------------------------------");
+        System.out.println("Optimization:");
+        System.out.println("--------------------------------------------------");
+        System.out.println("Index:");
+        System.out.println(indexSql);
+
+        // Create indexes
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(indexSql);
+            // Also create the regular composite index (may be needed)
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_user_date ON orders(user_id, order_date DESC)");
+            // VACUUM to update visibility map for Index Only Scan
+            stmt.execute("VACUUM ANALYZE orders");
+        }
+
+        System.out.println("\nOptimized approach:");
+        System.out.println("SQL:");
+        System.out.println(optimizedSql);
+
+        ExplainResult afterResult = runExplainAnalyze(optimizedSql);
+        System.out.println("\nEXPLAIN ANALYZE:");
+        for (String line : afterResult.outputLines) {
+            System.out.println("  " + line);
+        }
+
+        // --- Performance comparison ---
+        printPerformanceComparison(beforeResult, afterResult, optimizedExplanation);
+    }
+
+    // ========================================================================
+    // Business case demo driver
+    // ========================================================================
+
+    private void runBusinessCaseDemo(String caseTitle, String businessProblem,
+                                     String traditionalSql, String traditionalIssue,
+                                     String indexSql, String optimizedSql,
+                                     String optimizedExplanation,
+                                     String[] indexesToDrop, String querySql) throws Exception {
+
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println(caseTitle);
+        System.out.println("=".repeat(70));
+
+        System.out.println("\nBusiness problem:");
+        System.out.println("- " + businessProblem);
+
+        // --- Traditional approach ---
+        System.out.println("\n--------------------------------------------------");
+        System.out.println("Traditional approach:");
+        System.out.println("--------------------------------------------------");
+        System.out.println("SQL:");
+        System.out.println(traditionalSql);
+
+        // Drop related indexes to force traditional plan
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            for (String idx : indexesToDrop) {
+                stmt.execute("DROP INDEX IF EXISTS " + idx);
+            }
+            stmt.execute("ANALYZE orders");
+            stmt.execute("ANALYZE order_items");
+        }
+
+        ExplainResult beforeResult = runExplainAnalyze(querySql);
+        System.out.println("\nEXPLAIN ANALYZE:");
+        for (String line : beforeResult.outputLines) {
+            System.out.println("  " + line);
+        }
+
+        System.out.println("\nProblem:");
+        System.out.println("- " + traditionalIssue);
+
+        // --- Optimized approach ---
+        System.out.println("\n--------------------------------------------------");
+        System.out.println("Optimization:");
+        System.out.println("--------------------------------------------------");
+        System.out.println("Index:");
+        System.out.println(indexSql);
+
+        // Create the optimized index
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(indexSql);
+            stmt.execute("ANALYZE orders");
+            stmt.execute("ANALYZE order_items");
+        }
+
+        System.out.println("\nOptimized approach:");
+        System.out.println("SQL:");
+        System.out.println(optimizedSql);
+
+        ExplainResult afterResult = runExplainAnalyze(optimizedSql);
+        System.out.println("\nEXPLAIN ANALYZE:");
+        for (String line : afterResult.outputLines) {
+            System.out.println("  " + line);
+        }
+
+        // --- Performance comparison ---
+        printPerformanceComparison(beforeResult, afterResult, optimizedExplanation);
+    }
+
+    // ========================================================================
+    // Business case helper: EXPLAIN ANALYZE with time parsing
+    // ========================================================================
+
+    private static class ExplainResult {
+        final java.util.List<String> outputLines;
+        final double executionTimeMs;
+
+        ExplainResult(java.util.List<String> outputLines, double executionTimeMs) {
+            this.outputLines = outputLines;
+            this.executionTimeMs = executionTimeMs;
+        }
+    }
+
+    private ExplainResult runExplainAnalyze(String sql) {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        double execTime = 0.0;
+
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) " + sql)) {
+            while (rs.next()) {
+                String line = rs.getString(1);
+                lines.add(line);
+                if (line.contains("Execution Time:")) {
+                    String timeStr = line.substring(line.indexOf(":") + 1).trim();
+                    timeStr = timeStr.replace(" ms", "").trim();
+                    execTime = Double.parseDouble(timeStr);
+                }
+            }
+        } catch (Exception e) {
+            lines.add("Loi: " + e.getMessage());
+        }
+
+        return new ExplainResult(lines, execTime);
+    }
+
+    private void printPerformanceComparison(ExplainResult before, ExplainResult after,
+                                            String optimizedExplanation) {
+        System.out.println("\n==================================================");
+        System.out.println("Performance comparison:");
+        System.out.println("==================================================");
+        System.out.printf("Before: %.1f ms%n", before.executionTimeMs);
+        System.out.printf("After:  %.1f ms%n", after.executionTimeMs);
+
+        if (before.executionTimeMs > 0 && after.executionTimeMs > 0) {
+            double speedup = before.executionTimeMs / after.executionTimeMs;
+            System.out.printf("Speedup: %.1fx%n", speedup);
+        }
+
+        // Detect index used from after EXPLAIN output
+        String indexUsed = "N/A";
+        String afterPlan = "N/A";
+        for (String line : after.outputLines) {
+            if (line.contains("Index Only Scan using")) {
+                int start = line.indexOf("using ") + 6;
+                int end = line.indexOf(" on ", start);
+                if (end > start) indexUsed = line.substring(start, end);
+                afterPlan = "Index Only Scan";
+                break;
+            } else if (line.contains("Index Scan using")) {
+                int start = line.indexOf("using ") + 6;
+                int end = line.indexOf(" on ", start);
+                if (end > start) indexUsed = line.substring(start, end);
+                afterPlan = "Index Scan";
+                break;
+            }
+        }
+
+        String beforePlan = "N/A";
+        for (String line : before.outputLines) {
+            if (line.contains("Seq Scan")) {
+                beforePlan = line.trim().split("\\s+on\\s+")[0].trim();
+                break;
+            } else if (line.contains("Index Scan")) {
+                beforePlan = "Index Scan";
+                break;
+            }
+        }
+
+        System.out.println("\nExecution plan explanation:");
+        System.out.println("- Before: " + beforePlan);
+        System.out.println("- After:  " + afterPlan);
+        System.out.println("- Index used: " + indexUsed);
+        System.out.println("- " + optimizedExplanation);
+        System.out.println("=".repeat(70));
+    }
 }
